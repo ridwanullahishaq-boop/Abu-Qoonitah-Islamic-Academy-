@@ -1,0 +1,88 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Poppins", sans-serif;
+  --font-display: "Poppins", sans-serif;
+  --font-serif: "Poppins", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Natural Tones Palette Colors */
+  --color-natural-bg: #F9FAF7;
+  --color-natural-green: #1B4332;
+  --color-natural-gold: #D4AF37;
+  --color-natural-dark: #0f241a;
+  --color-natural-sage: #e8ede4;
+  --color-natural-accent: #2d6a4f;
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out forwards;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom scrollbars for Madrasah course playlists and dialogues */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c2410c; /* amber-700 */
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b45309; /* amber-800 */
+}
+
+/* Global Button Hover & Tactical Press Effects */
+button, 
+.btn, 
+a.btn, 
+input[type="submit"], 
+input[type="button"],
+.cursor-pointer {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:hover, 
+.btn:hover, 
+a.btn:hover, 
+input[type="submit"]:hover,
+input[type="button"]:hover,
+.cursor-pointer:hover {
+  transform: scale(1.025);
+  filter: brightness(1.08);
+}
+
+button:active, 
+.btn:active, 
+a.btn:active, 
+input[type="submit"]:active,
+input[type="button"]:active,
+.cursor-pointer:active {
+  transform: scale(0.97);
+  filter: brightness(0.95);
+}
+

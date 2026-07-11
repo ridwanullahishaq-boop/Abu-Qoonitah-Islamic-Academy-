@@ -1,0 +1,6 @@
+{
+  "name": "Abu Qoonitah Islamic Academy",
+  "description": "An elegant, comprehensive and secure online Madrasah Learning Management System (LMS) featuring robust portals for students, teachers, and administrators, level-based courses, digital Islamic and poetry libraries, donation tracking, and streaming sermons with a beautiful Islamic identity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
