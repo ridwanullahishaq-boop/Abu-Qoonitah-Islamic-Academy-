@@ -60,16 +60,62 @@ export default function SermonTV({ isArabic }: SermonTVProps) {
         <div className="lg:col-span-8 space-y-4">
           {activeSermon ? (
             <div className="space-y-4">
-              {/* Responsive Iframe Container */}
-              <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-black shadow-lg border border-emerald-50 dark:border-emerald-900/40">
-                <iframe
-                  className="absolute inset-0 w-full h-full"
-                  src={activeSermon.url}
-                  title={activeSermon.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              </div>
+              {/* Responsive Player Container (Video or Audio) */}
+              {activeSermon.isAudio || activeSermon.url?.startsWith("data:audio") || activeSermon.url?.endsWith(".mp3") || activeSermon.url?.endsWith(".wav") ? (
+                <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-gradient-to-br from-emerald-950 to-stone-950 shadow-lg border border-emerald-50 dark:border-emerald-900/40 flex flex-col items-center justify-center p-6">
+                  {/* Background cover art decoration */}
+                  {activeSermon.coverUrl ? (
+                    <img
+                      src={activeSermon.coverUrl}
+                      alt={activeSermon.title}
+                      className="absolute inset-0 w-full h-full object-cover opacity-20 filter blur-xs"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-emerald-950 opacity-10 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:16px_16px]" />
+                  )}
+                  
+                  {/* Sound Wave & Circle layout */}
+                  <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 border-amber-500/40 flex items-center justify-center bg-emerald-900/45 p-1 shadow-inner">
+                      {activeSermon.coverUrl ? (
+                        <img src={activeSermon.coverUrl} className="w-full h-full rounded-full object-cover" alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-emerald-800 flex items-center justify-center text-amber-500">
+                          <User className="w-8 h-8" />
+                        </div>
+                      )}
+                      <div className="absolute -inset-1.5 border border-amber-500/25 rounded-full animate-ping pointer-events-none" />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full">
+                        {isArabic ? "بث صوتي مباشر" : "Live Audio Sermon"}
+                      </span>
+                      <h3 className="text-sm sm:text-base font-semibold text-white truncate max-w-md px-4 font-serif">
+                        {activeSermon.title}
+                      </h3>
+                      <p className="text-xs text-emerald-300 font-medium">{activeSermon.speaker}</p>
+                    </div>
+
+                    <audio
+                      src={activeSermon.url}
+                      controls
+                      autoPlay
+                      className="w-full max-w-xs sm:max-w-md h-9 mt-2 rounded-full focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-black shadow-lg border border-emerald-50 dark:border-emerald-900/40">
+                  <iframe
+                    className="absolute inset-0 w-full h-full"
+                    src={activeSermon.url}
+                    title={activeSermon.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
+              )}
               
               {/* Active Video Details */}
               <div className="bg-white dark:bg-natural-dark rounded-3xl p-6 border border-emerald-50 dark:border-emerald-900/40 shadow-sm space-y-3">
@@ -149,14 +195,23 @@ export default function SermonTV({ isArabic }: SermonTVProps) {
                     : "bg-white dark:bg-natural-dark hover:bg-natural-sage/10 border-emerald-50 dark:border-emerald-900/40"
                 }`}
               >
-                {/* Play Circle Icon */}
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  activeSermon?.id === sermon.id 
-                    ? "bg-natural-gold text-white" 
-                    : "bg-natural-sage text-natural-green dark:bg-natural-green/60 dark:text-natural-gold"
-                }`}>
-                  <Play className="w-3.5 h-3.5 pl-0.5" />
-                </div>
+                {/* Thumbnail or Play Circle Icon */}
+                {sermon.coverUrl ? (
+                  <img
+                    src={sermon.coverUrl}
+                    alt=""
+                    className="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-emerald-50 dark:border-emerald-900/30"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                    activeSermon?.id === sermon.id 
+                      ? "bg-natural-gold text-white" 
+                      : "bg-natural-sage text-natural-green dark:bg-natural-green/60 dark:text-natural-gold"
+                  }`}>
+                    <Play className="w-3.5 h-3.5 pl-0.5" />
+                  </div>
+                )}
                 <div className="min-w-0 flex-grow">
                   <h4 className="text-xs font-bold text-natural-green dark:text-emerald-100 truncate">
                     {sermon.title}

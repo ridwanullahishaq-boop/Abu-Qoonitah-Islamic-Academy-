@@ -48,6 +48,8 @@ export interface Video {
   url: string; // Embed or stream url
   description: string;
   duration: string;
+  audioUrl?: string; // Voice note or audio lecture URL/Base64
+  photos?: string[]; // Slide/whiteboard photos
 }
 
 export interface Pdf {

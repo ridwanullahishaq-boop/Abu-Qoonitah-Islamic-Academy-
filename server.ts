@@ -79,7 +79,8 @@ async function saveToSupabase(dbState: any) {
   }
 }
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // --- DATABASE UTILITIES ---
 interface DatabaseSchema {
@@ -123,6 +124,17 @@ interface DatabaseSchema {
       titleEn: string;
       titleAr: string;
       items: { nameEn: string; nameAr: string; }[];
+    }[];
+    featuredCourses?: {
+      id: string;
+      level: string;
+      titleEn: string;
+      titleAr: string;
+      teacherEn: string;
+      teacherAr: string;
+      duration: string;
+      descEn: string;
+      descAr: string;
     }[];
   };
   donationSettings: {
@@ -480,6 +492,41 @@ const initialDB: DatabaseSchema = {
           { nameEn: "Level 2 - Second Semester Book: Fiqh, Tawheed, Hadith, Arabiyyah, Seerah", nameAr: "المستوى الثاني - الفصل الدراسي الثاني: الفقه، التوحيد، الحديث، العربية، السيرة النبوية" }
         ]
       }
+    ],
+    featuredCourses: [
+      {
+        id: "course-beg-1",
+        level: "Beginner",
+        titleEn: "Introduction to Arabic Alphabet",
+        titleAr: "مقدمة الحروف العربية",
+        teacherEn: "Shaykh Ahmed Al-Misri",
+        teacherAr: "الشيخ أحمد المصري",
+        duration: "6 Weeks",
+        descEn: "Master pronunciation and writing. Perfect for absolute beginners starting their Islamic path.",
+        descAr: "إتقان مخارج الحروف العربية ونطقها وكتابتها للمبتدئين."
+      },
+      {
+        id: "course-beg-2",
+        level: "Beginner",
+        titleEn: "Basic Tajweed Rules",
+        titleAr: "قواعد التجويد للمبتدئين",
+        teacherEn: "Shaykh Ahmed Al-Misri",
+        teacherAr: "الشيخ أحمد المصري",
+        duration: "8 Weeks",
+        descEn: "Learn the rules of Noon Sakinah and Tanween to recite Quran elegantly with clarity.",
+        descAr: "شرح أحكام النون الساكنة والتنوين وتلاوة القرآن بطريقة صحيحة."
+      },
+      {
+        id: "course-int-1",
+        level: "Intermediate",
+        titleEn: "Introduction to Al-Nahw (Arabic Grammar)",
+        titleAr: "مقدمة علم النحو",
+        teacherEn: "Ustadh Abu Qoonitah",
+        teacherAr: "أستاذ أبو قانتة",
+        duration: "10 Weeks",
+        descEn: "Examine word classifications and grammar states to decode sentence structures easily.",
+        descAr: "شرح تقسيم الكلمة والعلامات الإعرابية وتبسيط قواعد التركيب."
+      }
     ]
   },
   donationSettings: {
@@ -712,10 +759,11 @@ app.post("/api/admin/curriculum", authenticate, (req, res) => {
     res.status(403).json({ error: "Access denied. Admins only." });
     return;
   }
-  const { whyEnroll, sections } = req.body;
+  const { whyEnroll, sections, featuredCourses } = req.body;
   db.curriculum = {
     whyEnroll: whyEnroll !== undefined ? whyEnroll : db.curriculum.whyEnroll,
-    sections: sections !== undefined ? sections : db.curriculum.sections
+    sections: sections !== undefined ? sections : db.curriculum.sections,
+    featuredCourses: featuredCourses !== undefined ? featuredCourses : db.curriculum.featuredCourses
   };
   saveDatabase();
   res.json({ success: true, curriculum: db.curriculum });
@@ -1131,9 +1179,19 @@ app.post("/api/submissions/submit", authenticate, (req, res) => {
       }
     }
   } else if (type === "assignment") {
-    // 1 mark per assignment submitted rule as per University of Deen School Calendar
-    score = 1;
-    status = "graded";
+    // If it's a rich worksheet submission (with photos/audio/typed answers) or the assignment has points > 1,
+    // let it be "pending" for manual grading! Otherwise, system auto-mark.
+    const course = db.courses.find(c => c.id === courseId);
+    const assignment = course?.assignments.find(a => a.id === referenceId);
+    const hasRichAttachments = submissionContent && (submissionContent.includes('"photos"') || submissionContent.includes('"audio"'));
+
+    if (hasRichAttachments || (assignment && assignment.points > 1)) {
+      status = "pending";
+      score = undefined;
+    } else {
+      score = 1;
+      status = "graded";
+    }
   }
 
   const newSubmission: Submission = {
@@ -1148,10 +1206,10 @@ app.post("/api/submissions/submit", authenticate, (req, res) => {
     submissionContent,
     submittedAt: new Date().toISOString(),
     score,
-    maxPoints: type === "assignment" ? 1 : maxPoints,
+    maxPoints: type === "assignment" ? (status === "graded" ? 1 : (maxPoints || 100)) : maxPoints,
     status,
-    gradedBy: type === "quiz" ? "Auto Grader" : (type === "assignment" ? "System Auto-Mark" : undefined),
-    gradedAt: (type === "quiz" || type === "assignment") ? new Date().toISOString() : undefined
+    gradedBy: type === "quiz" ? "Auto Grader" : (type === "assignment" && status === "graded" ? "System Auto-Mark" : undefined),
+    gradedAt: (type === "quiz" || (type === "assignment" && status === "graded")) ? new Date().toISOString() : undefined
   };
 
   db.submissions.push(newSubmission);
@@ -1637,7 +1695,7 @@ app.post("/api/admin/courses/:id/materials", authenticate, (req, res) => {
   const userId = (req as any).userId;
   const user = db.users[userId];
   const courseId = req.params.id;
-  const { type, title, url, description, duration, fileSize } = req.body;
+  const { type, title, url, description, duration, fileSize, audioUrl, photos } = req.body;
 
   if (!user || (user.role !== "admin" && user.role !== "teacher")) {
     res.status(403).json({ error: "Access denied." });
@@ -1654,9 +1712,11 @@ app.post("/api/admin/courses/:id/materials", authenticate, (req, res) => {
     course.videos.push({
       id: "vid-" + crypto.randomBytes(6).toString("hex"),
       title,
-      url: url || "https://www.youtube.com/embed/vT4r_2bI-0Q",
+      url: url || "",
       description,
-      duration: duration || "10:00"
+      duration: duration || (audioUrl ? "Audio Lecture" : "10:00"),
+      audioUrl,
+      photos
     });
   } else if (type === "pdf") {
     course.pdfs.push({
@@ -1987,7 +2047,7 @@ app.put("/api/admin/courses/:courseId/materials/:type/:id", authenticate, (req, 
     return;
   }
   const { courseId, type, id } = req.params;
-  const { title, url, description, duration, fileSize, dueDate, points } = req.body;
+  const { title, url, description, duration, fileSize, dueDate, points, audioUrl, photos } = req.body;
   const course = db.courses.find(c => c.id === courseId);
   if (!course) {
     res.status(404).json({ error: "Course not found" });
@@ -2004,6 +2064,8 @@ app.put("/api/admin/courses/:courseId/materials/:type/:id", authenticate, (req, 
     if (url !== undefined) video.url = url;
     if (description !== undefined) video.description = description;
     if (duration !== undefined) video.duration = duration;
+    if (audioUrl !== undefined) video.audioUrl = audioUrl;
+    if (photos !== undefined) video.photos = photos;
   } else if (type === "pdf") {
     const pdf = course.pdfs.find(p => p.id === id);
     if (!pdf) {

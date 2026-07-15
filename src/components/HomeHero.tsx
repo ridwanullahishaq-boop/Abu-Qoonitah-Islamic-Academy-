@@ -20,6 +20,8 @@ export default function HomeHero({ isArabic, setActivePage, isDarkMode }: HomeHe
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [quote, setQuote] = useState({ arabic: "", translation: "", source: "" });
 
+  const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
+
   useEffect(() => {
     // Fetch statistics
     fetch("/api/public/stats")
@@ -50,9 +52,24 @@ export default function HomeHero({ isArabic, setActivePage, isDarkMode }: HomeHe
       .then((res) => res.json())
       .then((data) => setQuote(data))
       .catch((err) => console.error("Error loading quote:", err));
+
+    // Fetch public curriculum and its featured courses
+    fetch("/api/public/curriculum")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data.featuredCourses) && data.featuredCourses.length > 0) {
+          setFeaturedCourses(data.featuredCourses);
+        } else {
+          setFeaturedCourses(defaultFeaturedCourses);
+        }
+      })
+      .catch((err) => {
+        console.error("Error loading curriculum:", err);
+        setFeaturedCourses(defaultFeaturedCourses);
+      });
   }, []);
 
-  const featuredCourses = [
+  const defaultFeaturedCourses = [
     {
       id: "course-beg-1",
       level: "Beginner",

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { User, Course, Submission, Announcement, SchoolCalendarEvent, DiscussionMessage, DirectMessage } from "../types";
 import {
   BookOpen, Users, Video, FileText, CheckCircle2, AlertTriangle, Send, Mail, Key, Shield, UserPlus,
@@ -176,6 +176,14 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [activeAssign, setActiveAssign] = useState<any | null>(null);
   const [assignText, setAssignText] = useState("");
   const [assignSubmitSuccess, setAssignSubmitSuccess] = useState(false);
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+  const [uploadedAudio, setUploadedAudio] = useState<string | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recordingTimerRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // Discussion forum states
   const [forumMessages, setForumMessages] = useState<DiscussionMessage[]>([]);
@@ -197,6 +205,8 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [teacherCourseId, setTeacherCourseId] = useState("");
   const [selectedStudentDetailsId, setSelectedStudentDetailsId] = useState<string | null>(null);
   const [gradingFilter, setGradingFilter] = useState<"pending" | "graded">("pending");
+  const [gradingSearchText, setGradingSearchText] = useState("");
+  const [gradingTypeFilter, setGradingTypeFilter] = useState<"all" | "assignment" | "quiz" | "exam">("all");
 
   // Manual grading custom states
   const [showManualGradeForm, setShowManualGradeForm] = useState(false);
@@ -228,6 +238,15 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [matDurationOrSize, setMatDurationOrSize] = useState("");
   const [matDueDate, setMatDueDate] = useState("");
   const [editingMaterial, setEditingMaterial] = useState<{ type: 'video' | 'pdf' | 'assignment', id: string, courseId: string } | null>(null);
+
+  // Teacher lecture recording / multiple photos states
+  const [matAudioUrl, setMatAudioUrl] = useState<string | null>(null);
+  const [matPhotos, setMatPhotos] = useState<string[]>([]);
+  const [isRecordingMat, setIsRecordingMat] = useState(false);
+  const [recordingMatSeconds, setRecordingMatSeconds] = useState(0);
+  const recordingMatTimerRef = useRef<any>(null);
+  const teacherMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const teacherAudioChunksRef = useRef<Blob[]>([]);
 
   // Admin states
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
@@ -273,16 +292,23 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   // Admin Curriculum states
   const [currWhyEnroll, setCurrWhyEnroll] = useState("");
   const [currSections, setCurrSections] = useState<{ id: string; titleEn: string; titleAr: string; items: { nameEn: string; nameAr: string }[] }[]>([]);
+  const [currFeaturedCourses, setCurrFeaturedCourses] = useState<{ id: string; level: string; titleEn: string; titleAr: string; teacherEn: string; teacherAr: string; duration: string; descEn: string; descAr: string }[]>([]);
   const [currSaving, setCurrSaving] = useState(false);
   const [currMessage, setCurrMessage] = useState("");
 
   // Admin Sermon TV states
-  const [sermons, setSermons] = useState<{ id: string; title: string; category: string; duration: string; url: string; speaker: string }[]>([]);
+  const [sermons, setSermons] = useState<{ id: string; title: string; category: string; duration: string; url: string; speaker: string; coverUrl?: string; isAudio?: boolean }[]>([]);
   const [newSermonTitle, setNewSermonTitle] = useState("");
   const [newSermonCategory, setNewSermonCategory] = useState("Sermon");
   const [newSermonDuration, setNewSermonDuration] = useState("");
   const [newSermonUrl, setNewSermonUrl] = useState("");
   const [newSermonSpeaker, setNewSermonSpeaker] = useState("Shaykh Abu Qoonitah");
+  const [newSermonCoverUrl, setNewSermonCoverUrl] = useState("");
+  const [isRecordingSermon, setIsRecordingSermon] = useState(false);
+  const [mediaRecorderSermon, setMediaRecorderSermon] = useState<MediaRecorder | null>(null);
+  const [recordingSecondsSermon, setRecordingSecondsSermon] = useState(0);
+  const [recordingIntervalIdSermon, setRecordingIntervalIdSermon] = useState<any>(null);
+  const [audioBlobUrlSermon, setAudioBlobUrlSermon] = useState<string | null>(null);
   const [sermonSaving, setSermonSaving] = useState(false);
   const [sermonMessage, setSermonMessage] = useState("");
 
@@ -551,13 +577,14 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
             }
           })
           .catch((err) => console.error(err));
-      } else if (adminSubTab === "curriculum") {
+      } else if (adminSubTab === "curriculum" || adminSubTab === "curriculumSettings") {
         fetch("/api/public/curriculum")
           .then((res) => res.json())
           .then((data) => {
             if (data) {
               setCurrWhyEnroll(data.whyEnroll || "");
               setCurrSections(data.sections || []);
+              setCurrFeaturedCourses(data.featuredCourses || []);
             }
           })
           .catch((err) => console.error(err));
@@ -839,11 +866,204 @@ Please verify my payment receipt and activate my admission. Jazakum Allahu Khair
       .catch((err) => console.error(err));
   };
 
-  // Submit text assignment
-  const handleAssignSubmit = (e: React.FormEvent) => {
+  // Base64 helper for custom files
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Image change handler
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const base64Promises = Array.from(files).map((file: any) => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (err) => reject(err);
+      });
+    });
+
+    try {
+      const base64s = await Promise.all(base64Promises);
+      setUploadedPhotos((prev) => [...prev, ...base64s]);
+    } catch (err) {
+      console.error("Error reading images:", err);
+      alert("Failed to read image files.");
+    }
+  };
+
+  // Microphone audio recorder handlers
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event: any) => {
+        if (event.data && event.data.size > 0) {
+          (audioChunksRef.current as any[]).push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const mimeType = mediaRecorderRef.current?.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current as any[], { type: mimeType });
+        const previewUrl = URL.createObjectURL(audioBlob);
+        setAudioPreviewUrl(previewUrl);
+
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64Audio = reader.result as string;
+          setUploadedAudio(base64Audio);
+        };
+        
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.error("Mic access error:", err);
+      alert("🎙️ Microphone access was denied or is not supported. Please make sure the site has microphone permission, or select/upload a recorded audio file instead.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    }
+  };
+
+  const deleteRecording = () => {
+    setUploadedAudio(null);
+    setAudioPreviewUrl(null);
+    setRecordingSeconds(0);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+    }
+  };
+
+  // --- TEACHER STUDY MATERIAL ATTACHMENTS HELPERS ---
+  const handleMatPhotosChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const base64Promises = Array.from(files).map((file: any) => {
+      return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+      });
+    });
+
+    try {
+      const base64s = await Promise.all(base64Promises);
+      setMatPhotos((prev) => [...prev, ...base64s]);
+    } catch (err) {
+      console.error("Error reading images for lecture:", err);
+      alert("Failed to read slide image files.");
+    }
+  };
+
+  const startRecordingMat = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      teacherMediaRecorderRef.current = mediaRecorder;
+      teacherAudioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event: any) => {
+        if (event.data && event.data.size > 0) {
+          (teacherAudioChunksRef.current as any[]).push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const mimeType = teacherMediaRecorderRef.current?.mimeType || "audio/webm";
+        const audioBlob = new Blob(teacherAudioChunksRef.current as any[], { type: mimeType });
+        const previewUrl = URL.createObjectURL(audioBlob);
+
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64Audio = reader.result as string;
+          setMatAudioUrl(base64Audio);
+        };
+        
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecordingMat(true);
+      setRecordingMatSeconds(0);
+
+      recordingMatTimerRef.current = setInterval(() => {
+        setRecordingMatSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.error("Teacher Mic access error:", err);
+      alert("🎙️ Microphone access was denied or is not supported. Please make sure the site has microphone permission, or check your device configuration.");
+    }
+  };
+
+  const stopRecordingMat = () => {
+    if (teacherMediaRecorderRef.current && isRecordingMat) {
+      teacherMediaRecorderRef.current.stop();
+      setIsRecordingMat(false);
+      if (recordingMatTimerRef.current) {
+        clearInterval(recordingMatTimerRef.current);
+      }
+    }
+  };
+
+  const deleteRecordingMat = () => {
+    setMatAudioUrl(null);
+    setRecordingMatSeconds(0);
+    if (recordingMatTimerRef.current) {
+      clearInterval(recordingMatTimerRef.current);
+    }
+  };
+
+  // Submit rich worksheet / homework assignment
+  const handleAssignSubmitRich = (e: React.FormEvent, assignmentItem: any) => {
     e.preventDefault();
-    if (!selectedCourse || !activeAssign || !assignText.trim()) return;
+    const courseObj = courses.find(c => c.assignments.some(a => a.id === assignmentItem.id));
+    if (!courseObj) {
+      alert("Course not found for this assignment.");
+      return;
+    }
+    
+    if (!assignText.trim() && uploadedPhotos.length === 0 && !uploadedAudio) {
+      alert("⚠️ Please provide some content before submitting. Write an answer, upload homework photos, or record/upload a voice note.");
+      return;
+    }
+
     const token = localStorage.getItem("token") || "";
+    
+    const wrappedContent = JSON.stringify({
+      text: assignText,
+      photos: uploadedPhotos,
+      audio: uploadedAudio
+    });
 
     fetch("/api/submissions/submit", {
       method: "POST",
@@ -852,25 +1072,35 @@ Please verify my payment receipt and activate my admission. Jazakum Allahu Khair
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
-        courseId: selectedCourse.id,
+        courseId: courseObj.id,
         type: "assignment",
-        referenceId: activeAssign.id,
-        referenceTitle: activeAssign.title,
-        submissionContent: assignText,
-        maxPoints: activeAssign.points
+        referenceId: assignmentItem.id,
+        referenceTitle: assignmentItem.title,
+        submissionContent: wrappedContent,
+        maxPoints: assignmentItem.points
       })
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) return res.json().then((d) => { throw new Error(d.error); });
+        return res.json();
+      })
       .then((data) => {
         setSubmissions([data.submission, ...submissions]);
         setAssignSubmitSuccess(true);
         setAssignText("");
+        setUploadedPhotos([]);
+        setUploadedAudio(null);
+        setAudioPreviewUrl(null);
+        
         setTimeout(() => {
           setAssignSubmitSuccess(false);
           setActiveAssign(null);
-        }, 5000);
+        }, 3000);
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error(err);
+        alert(`Failed to submit: ${err.message}`);
+      });
   };
 
   // Submit Tuition Receipt
@@ -1158,7 +1388,9 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
       url: matUrl,
       description: matDesc,
       duration: matDurationOrSize,
-      fileSize: matDurationOrSize
+      fileSize: matDurationOrSize,
+      audioUrl: matAudioUrl,
+      photos: matPhotos
     };
 
     if (matType === "assignment") {
@@ -1190,6 +1422,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
         setMatDesc("");
         setMatDurationOrSize("");
         setMatDueDate("");
+        setMatAudioUrl(null);
+        setMatPhotos([]);
         setEditingMaterial(null);
         alert(isEditing ? "Educational material updated successfully!" : "Educational material appended successfully!");
       })
@@ -1347,6 +1581,90 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     reader.readAsDataURL(file);
   };
 
+  const handleSermonCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewSermonCoverUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const startSermonRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks: BlobPart[] = [];
+      const recorder = new MediaRecorder(stream);
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunks, { type: "audio/wav" });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64Audio = reader.result as string;
+          setNewSermonUrl(base64Audio);
+          setAudioBlobUrlSermon(base64Audio);
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorderSermon(recorder);
+      setIsRecordingSermon(true);
+      setRecordingSecondsSermon(0);
+
+      // We need to keep track of a local mutable variable inside the setInterval scope
+      // because React state updates are asynchronous and the closure would capture 0.
+      let secondsTracked = 0;
+      const interval = setInterval(() => {
+        secondsTracked += 1;
+        setRecordingSecondsSermon(secondsTracked);
+      }, 1000);
+      setRecordingIntervalIdSermon(interval);
+    } catch (err) {
+      alert("Microphone access denied or not supported in this browser.");
+      console.error(err);
+    }
+  };
+
+  const stopSermonRecording = () => {
+    if (mediaRecorderSermon && isRecordingSermon) {
+      mediaRecorderSermon.stop();
+      setIsRecordingSermon(false);
+      if (recordingIntervalIdSermon) {
+        clearInterval(recordingIntervalIdSermon);
+        setRecordingIntervalIdSermon(null);
+      }
+      // Calculate duration from the actual recorded state seconds
+      const mins = Math.floor(recordingSecondsSermon / 60);
+      const secs = recordingSecondsSermon % 60;
+      setNewSermonDuration(`${mins}:${secs.toString().padStart(2, "0")}`);
+    }
+  };
+
+  const cancelSermonRecording = () => {
+    if (mediaRecorderSermon) {
+      try {
+        mediaRecorderSermon.stop();
+      } catch (e) {}
+    }
+    setIsRecordingSermon(false);
+    setAudioBlobUrlSermon(null);
+    setNewSermonUrl("");
+    if (recordingIntervalIdSermon) {
+      clearInterval(recordingIntervalIdSermon);
+      setRecordingIntervalIdSermon(null);
+    }
+    setRecordingSecondsSermon(0);
+  };
+
   const handleSaveFreeCourse = (e: React.FormEvent) => {
     e.preventDefault();
     setFcSaving(true);
@@ -1435,7 +1753,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
     const payload = {
       whyEnroll: currWhyEnroll,
-      sections: currSections
+      sections: currSections,
+      featuredCourses: currFeaturedCourses
     };
 
     fetch("/api/admin/curriculum", {
@@ -1472,13 +1791,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     // Append new sermon if fields are set
     let updatedSermons = [...sermons];
     if (newSermonTitle && newSermonUrl) {
+      const isAudioSermon = newSermonUrl.startsWith("data:audio") || newSermonUrl.includes(".mp3") || newSermonUrl.includes(".wav") || !!audioBlobUrlSermon;
       const newSermon = {
         id: "sermon-" + Date.now(),
         title: newSermonTitle,
         category: newSermonCategory,
         duration: newSermonDuration || "15 mins",
         url: newSermonUrl,
-        speaker: newSermonSpeaker
+        speaker: newSermonSpeaker,
+        coverUrl: newSermonCoverUrl || "",
+        isAudio: isAudioSermon
       };
       updatedSermons = [...updatedSermons, newSermon];
     }
@@ -1499,6 +1821,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
           setNewSermonTitle("");
           setNewSermonUrl("");
           setNewSermonDuration("");
+          setNewSermonCoverUrl("");
+          setAudioBlobUrlSermon(null);
           setSermonMessage("🎉 Sermon TV list saved successfully!");
           setTimeout(() => setSermonMessage(""), 4500);
         } else {
@@ -2027,6 +2351,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     setMatTitle(item.title || "");
     setMatUrl(item.url || "");
     setMatDesc(item.description || "");
+    setMatAudioUrl(item.audioUrl || null);
+    setMatPhotos(item.photos || []);
     if (type === "video") {
       setMatDurationOrSize(item.duration || "");
       setMatDueDate("");
@@ -3297,19 +3623,51 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   {selectedCourse.videos.map((vid) => (
                                     <details key={vid.id} className="bg-emerald-50/50 dark:bg-emerald-950/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/40 text-xs">
                                       <summary className="font-bold cursor-pointer text-emerald-900 dark:text-white flex justify-between items-center select-none">
-                                        <span>◈ {vid.title}</span>
-                                        <span className="font-mono text-[9px] bg-emerald-800 text-white px-2 py-0.5 rounded">{vid.duration}</span>
+                                        <span className="flex items-center gap-1.5 flex-wrap">
+                                          <span>◈ {vid.title}</span>
+                                          {(vid.audioUrl || (vid.photos && vid.photos.length > 0)) && (
+                                            <span className="text-[8px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider font-mono">Audio & Slides</span>
+                                          )}
+                                        </span>
+                                        <span className="font-mono text-[9px] bg-emerald-800 text-white px-2 py-0.5 rounded">{vid.duration || "Audio Lecture"}</span>
                                       </summary>
-                                      <div className="mt-3 space-y-2">
-                                        <p className="text-[11px] text-emerald-650 dark:text-emerald-300">{vid.description}</p>
-                                        <div className="aspect-video w-full rounded overflow-hidden bg-black border border-emerald-850">
-                                          <iframe
-                                            className="w-full h-full"
-                                            src={vid.url}
-                                            title={vid.title}
-                                            allowFullScreen
-                                          />
-                                        </div>
+                                      <div className="mt-3 space-y-3">
+                                        <p className="text-[11px] text-emerald-650 dark:text-emerald-300 font-sans leading-relaxed">{vid.description}</p>
+                                        
+                                        {/* Audio voice note if present */}
+                                        {vid.audioUrl && (
+                                          <div className="space-y-1 bg-white dark:bg-emerald-950 p-2.5 rounded-lg border border-emerald-100/50 dark:border-emerald-900/40">
+                                            <span className="font-bold text-[9px] text-amber-600 block uppercase font-mono">🎙️ Teacher's Voice Note Explanatory Lecture:</span>
+                                            <audio src={vid.audioUrl} controls className="w-full h-8 mt-1" />
+                                          </div>
+                                        )}
+
+                                        {/* Board photos if present */}
+                                        {vid.photos && vid.photos.length > 0 && (
+                                          <div className="space-y-2">
+                                            <span className="font-bold text-[9px] text-emerald-800 dark:text-emerald-300 block uppercase font-mono">📸 Lesson Board Slides / Materials ({vid.photos.length}):</span>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                              {vid.photos.map((photo, pIdx) => (
+                                                <a key={pIdx} href={photo} target="_blank" rel="noopener noreferrer" className="relative group block rounded border border-emerald-100 dark:border-emerald-850 overflow-hidden bg-slate-50 aspect-square">
+                                                  <img src={photo} alt={`Slide ${pIdx + 1}`} className="w-full h-full object-cover" />
+                                                  <span className="absolute inset-0 bg-black/55 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[9px] font-bold">Zoom slide</span>
+                                                </a>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* YouTube embed if URL is set and is not empty */}
+                                        {vid.url && (
+                                          <div className="aspect-video w-full rounded overflow-hidden bg-black border border-emerald-850">
+                                            <iframe
+                                              className="w-full h-full"
+                                              src={vid.url}
+                                              title={vid.title}
+                                              allowFullScreen
+                                            />
+                                          </div>
+                                        )}
                                       </div>
                                     </details>
                                   ))}
@@ -3579,9 +3937,53 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                       </span>
                                       <span className="capitalize">{sub.status}</span>
                                     </div>
-                                    <div className="bg-emerald-50/50 dark:bg-emerald-900/30 p-2 rounded text-[11px] font-mono leading-relaxed break-all">
-                                      Your Submission: {sub.submissionContent}
+                                    
+                                    <div className="bg-emerald-50/50 dark:bg-emerald-900/30 p-3 rounded text-[11px] font-sans leading-relaxed space-y-3">
+                                      <span className="font-bold text-[10px] text-amber-600 block uppercase">Your Submitted Worksheet Content:</span>
+                                      {(() => {
+                                        try {
+                                          if (sub.submissionContent.startsWith("{") && sub.submissionContent.endsWith("}")) {
+                                            const rich = JSON.parse(sub.submissionContent);
+                                            return (
+                                              <div className="space-y-3">
+                                                {rich.text && (
+                                                  <div className="whitespace-pre-wrap text-emerald-950 dark:text-white font-serif text-xs bg-white dark:bg-emerald-950/40 p-2.5 rounded border border-emerald-100/50">
+                                                    {rich.text}
+                                                  </div>
+                                                )}
+                                                
+                                                {rich.photos && rich.photos.length > 0 && (
+                                                  <div className="space-y-1">
+                                                    <span className="font-semibold text-[9px] text-emerald-750 dark:text-emerald-300 block">Uploaded Photos ({rich.photos.length}):</span>
+                                                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                                      {rich.photos.map((src: string, idx: number) => (
+                                                        <a key={idx} href={src} target="_blank" rel="noopener noreferrer" className="relative group block rounded border border-emerald-100 overflow-hidden bg-slate-50 aspect-square">
+                                                          <img src={src} alt={`Attachment ${idx + 1}`} className="w-full h-full object-cover" />
+                                                          <span className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[9px] font-bold">Zoom</span>
+                                                        </a>
+                                                      ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                                
+                                                {rich.audio && (
+                                                  <div className="space-y-1 bg-white dark:bg-emerald-950/40 p-2 rounded border border-emerald-100/50">
+                                                    <span className="font-semibold text-[9px] text-emerald-750 dark:text-emerald-300 flex items-center gap-1">
+                                                      <span>🎙️ Attached Voice Note / Explanatory Audio:</span>
+                                                    </span>
+                                                    <audio src={rich.audio} controls className="w-full h-8 mt-1 text-xs" />
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          }
+                                        } catch (err) {}
+                                        
+                                        // Fallback to plain text
+                                        return <div className="break-all font-mono text-[10px] whitespace-pre-wrap">{sub.submissionContent}</div>;
+                                      })()}
                                     </div>
+
                                     {sub.status === "graded" ? (
                                       <div className="p-2 bg-emerald-100/50 dark:bg-emerald-950/50 rounded border border-emerald-200/50">
                                         <div className="font-bold text-emerald-900 dark:text-amber-100">Score: {sub.score} / {sub.maxPoints}</div>
@@ -3594,13 +3996,185 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 ) : (
                                   <div className="space-y-3">
                                     {activeAssign?.id === assign.id ? (
-                                      <form onSubmit={handleTuitionSubmit} className="p-4 bg-amber-500/5 rounded border border-amber-500/20 text-xs space-y-3 animate-fade-in">
-                                        {/* Submit via parent function directly but map state */}
+                                      <form onSubmit={(e) => handleAssignSubmitRich(e, assign)} className="p-5 bg-amber-500/5 rounded-xl border border-amber-500/20 text-xs space-y-4 animate-fade-in text-emerald-950 dark:text-white">
+                                        <div className="flex justify-between items-center pb-2 border-b border-emerald-150">
+                                          <h4 className="font-bold text-emerald-900 dark:text-amber-100 flex items-center gap-1.5">
+                                            <span>📝 Worksheet Answer Submission Sheet</span>
+                                          </h4>
+                                          <button 
+                                            type="button" 
+                                            onClick={() => { setActiveAssign(null); setUploadedPhotos([]); setUploadedAudio(null); setAudioPreviewUrl(null); }}
+                                            className="text-red-500 hover:text-red-700 text-xs font-bold cursor-pointer bg-none border-none"
+                                          >
+                                            Close Form
+                                          </button>
+                                        </div>
+
+                                        {assignSubmitSuccess ? (
+                                          <div className="p-4 bg-emerald-100/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 text-center rounded border border-emerald-200">
+                                            <Check className="w-8 h-8 text-emerald-600 mx-auto animate-bounce mb-1" />
+                                            <div className="font-bold">Barakallahu Feekum!</div>
+                                            <p className="text-[10px] mt-0.5">Your answer worksheet and media attachments have been successfully submitted for grading.</p>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            {/* Text Field */}
+                                            <div className="space-y-1">
+                                              <label className="block text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide">Write Written Answers / Explanatory Notes (Optional if uploading images/audio):</label>
+                                              <textarea
+                                                rows={5}
+                                                value={assignText}
+                                                onChange={(e) => setAssignText(e.target.value)}
+                                                placeholder="Type your translation, syntax breakdown, or script answers here..."
+                                                className="w-full bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                                              />
+                                            </div>
+
+                                            {/* Images Area (Multiple Photos) */}
+                                            <div className="space-y-2 pt-2 border-t border-emerald-150">
+                                              <div className="flex justify-between items-center">
+                                                <label className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide flex items-center gap-1">
+                                                  <span>📸 Upload Worksheet Photos (Phone Gallery / Camera):</span>
+                                                </label>
+                                                <span className="text-[9px] font-mono text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/45 px-2 py-0.5 rounded">
+                                                  {uploadedPhotos.length} Photos Selected
+                                                </span>
+                                              </div>
+                                              
+                                              <p className="text-[10px] text-slate-400 mt-[-4px]">
+                                                Snap photos of your written notes on paper and upload them. You can upload more than 5 photos!
+                                              </p>
+
+                                              <div className="flex flex-wrap gap-2 items-center">
+                                                {/* File input trigger */}
+                                                <label className="relative flex flex-col items-center justify-center w-20 h-20 border-2 border-dashed border-emerald-300 dark:border-emerald-700 rounded-lg cursor-pointer bg-emerald-50/20 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors">
+                                                  <Plus className="w-5 h-5 text-emerald-600" />
+                                                  <span className="text-[8px] font-bold text-emerald-750 dark:text-emerald-300 mt-1">Add Image</span>
+                                                  <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    multiple
+                                                    onChange={handleImageChange}
+                                                    className="hidden"
+                                                  />
+                                                </label>
+
+                                                {/* Photo Previews */}
+                                                <div className="flex flex-wrap gap-2">
+                                                  {uploadedPhotos.map((photo, pIdx) => (
+                                                    <div key={pIdx} className="relative w-20 h-20 rounded-lg border border-emerald-150 overflow-hidden bg-slate-50 shadow-sm">
+                                                      <img src={photo} alt={`Preview ${pIdx + 1}`} className="w-full h-full object-cover" />
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => setUploadedPhotos(uploadedPhotos.filter((_, idx) => idx !== pIdx))}
+                                                        className="absolute top-1 right-1 bg-red-650/90 hover:bg-red-700 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow cursor-pointer focus:outline-none"
+                                                        title="Remove photo"
+                                                      >
+                                                        ×
+                                                      </button>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Audio / Voice Notes Area */}
+                                            <div className="space-y-2 pt-2 border-t border-emerald-150">
+                                              <label className="block text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide">
+                                                🎙️ Explanatory Voice Note or Audio file:
+                                              </label>
+                                              
+                                              <p className="text-[10px] text-slate-400 mt-[-4px]">
+                                                Explain your worksheet answer or recitation. Record directly using your mic or select an audio file!
+                                              </p>
+
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-emerald-50/10 dark:bg-emerald-950/20 p-3 rounded-lg border border-emerald-100/50">
+                                                {/* Option A: Direct Mic Recording */}
+                                                <div className="space-y-2">
+                                                  <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 block uppercase font-mono">Option A: Record Live voice note</span>
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                    {isRecording ? (
+                                                      <button
+                                                        type="button"
+                                                        onClick={stopRecording}
+                                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded text-[10px] flex items-center gap-1 animate-pulse cursor-pointer"
+                                                      >
+                                                        <span className="w-2 h-2 bg-white rounded-full animate-ping"></span>
+                                                        Stop ({recordingSeconds}s)
+                                                      </button>
+                                                    ) : (
+                                                      <button
+                                                        type="button"
+                                                        onClick={startRecording}
+                                                        className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-[10px] flex items-center gap-1.5 cursor-pointer"
+                                                      >
+                                                        <span>🎙️ Start Recording</span>
+                                                      </button>
+                                                    )}
+
+                                                    {audioPreviewUrl && (
+                                                      <button
+                                                        type="button"
+                                                        onClick={deleteRecording}
+                                                        className="px-2 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded text-[10px] font-bold cursor-pointer"
+                                                      >
+                                                        Remove Rec
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                </div>
+
+                                                {/* Option B: Choose Audio File */}
+                                                <div className="space-y-2 border-t sm:border-t-0 sm:border-l border-emerald-150 pt-2 sm:pt-0 sm:pl-4">
+                                                  <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 block uppercase font-mono">Option B: Select audio file</span>
+                                                  <input
+                                                    type="file"
+                                                    accept="audio/*"
+                                                    onChange={async (e) => {
+                                                      const file = e.target.files?.[0];
+                                                      if (file) {
+                                                        const base64 = await convertToBase64(file);
+                                                        setUploadedAudio(base64);
+                                                        setAudioPreviewUrl(URL.createObjectURL(file));
+                                                      }
+                                                    }}
+                                                    className="block w-full text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-semibold file:bg-emerald-50 file:text-emerald-750 hover:file:bg-emerald-100 cursor-pointer"
+                                                  />
+                                                </div>
+                                              </div>
+
+                                              {/* Playback preview */}
+                                              {audioPreviewUrl && (
+                                                <div className="p-2.5 bg-white dark:bg-emerald-950/40 border border-emerald-100/50 rounded-lg flex flex-col gap-1.5">
+                                                  <span className="text-[9px] text-emerald-700 dark:text-emerald-300 font-bold">▶️ Listen to your recording/audio preview before sending:</span>
+                                                  <audio src={audioPreviewUrl} controls className="w-full h-8" />
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            {/* Submission controls */}
+                                            <div className="flex gap-2 pt-3 border-t border-emerald-150">
+                                              <button
+                                                type="submit"
+                                                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold rounded text-xs cursor-pointer shadow-xs font-sans flex items-center gap-1.5 active:scale-95 transition-all"
+                                              >
+                                                <span>🚀 Submit Completed Worksheet</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => { setActiveAssign(null); setUploadedPhotos([]); setUploadedAudio(null); setAudioPreviewUrl(null); }}
+                                                className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded text-xs font-semibold cursor-pointer active:scale-95 transition-all"
+                                              >
+                                                Cancel
+                                              </button>
+                                            </div>
+                                          </>
+                                        )}
                                       </form>
                                     ) : (
                                       <button
-                                        onClick={() => { setSelectedCourse(courses.find(c => c.id === assign.courseId) || null); setStudentSubTab("courses"); }}
-                                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold rounded text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                        onClick={() => { setActiveAssign(assign); setAssignText(""); setUploadedPhotos([]); setUploadedAudio(null); setAudioPreviewUrl(null); }}
+                                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold rounded text-xs flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
                                       >
                                         <span>Write & Submit Answer Worksheet</span>
                                         <ArrowRight className="w-3.5 h-3.5" />
@@ -4805,6 +5379,43 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         </div>
                       </div>
 
+                      {/* Search & Type Filter Bar */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-emerald-50/20 dark:bg-emerald-950/20 rounded-xl border border-emerald-100/55 dark:border-emerald-850/60 text-xs">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-850 dark:text-emerald-300 uppercase tracking-wide font-mono block">🔍 Search Student or Item</label>
+                          <input
+                            type="text"
+                            value={gradingSearchText}
+                            onChange={(e) => setGradingSearchText(e.target.value)}
+                            placeholder="Type student name, course or assignment title..."
+                            className="w-full bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 text-emerald-950 dark:text-white"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-850 dark:text-emerald-300 uppercase tracking-wide font-mono block">📚 Filter Submission Type</label>
+                          <select
+                            value={gradingTypeFilter}
+                            onChange={(e: any) => setGradingTypeFilter(e.target.value)}
+                            className="w-full bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 text-emerald-950 dark:text-white cursor-pointer"
+                          >
+                            <option value="all">📖 All Submissions</option>
+                            <option value="assignment">📝 Written Worksheets / Homework</option>
+                            <option value="quiz">📝 Computer-Based Quizzes</option>
+                            <option value="exam">🎓 Final Exams / CBT Tests</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end justify-end">
+                          {(gradingSearchText || gradingTypeFilter !== "all") && (
+                            <button
+                              onClick={() => { setGradingSearchText(""); setGradingTypeFilter("all"); }}
+                              className="px-3 py-2 bg-slate-100 dark:bg-emerald-950 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-semibold rounded text-xs transition-all cursor-pointer border border-slate-200/50 dark:border-emerald-850"
+                            >
+                              Clear Filters
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Log Manual Custom Grade Form */}
                       {showManualGradeForm && (
                         <form onSubmit={handleManualGradeSubmit} className="bg-amber-50/50 dark:bg-emerald-950/25 border border-amber-500/25 rounded-xl p-5 space-y-4 text-xs animate-fade-in text-emerald-950 dark:text-white">
@@ -4928,7 +5539,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                       <div className="space-y-4 font-sans">
                         {/* Pending Submissions */}
-                        {gradingFilter === "pending" && submissions.filter(s => s.status === "pending").map((sub) => (
+                        {gradingFilter === "pending" && submissions
+                          .filter(s => s.status === "pending")
+                          .filter(s => gradingTypeFilter === "all" || s.type === gradingTypeFilter)
+                          .filter(s => {
+                            if (!gradingSearchText) return true;
+                            const q = gradingSearchText.toLowerCase();
+                            return s.studentName.toLowerCase().includes(q) ||
+                                   s.courseTitle.toLowerCase().includes(q) ||
+                                   (s.referenceTitle || "").toLowerCase().includes(q);
+                          })
+                          .map((sub) => (
                           <div key={sub.id} className="p-5 bg-emerald-50/30 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-xl space-y-4 text-xs text-emerald-950 dark:text-white">
                             <div className="flex justify-between items-start border-b border-emerald-100 dark:border-emerald-800/65 pb-2">
                               <div>
@@ -4940,9 +5561,144 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               </span>
                             </div>
 
-                            <div className="bg-white dark:bg-emerald-950 p-3 rounded-lg border border-emerald-100 dark:border-emerald-850 font-mono text-[11px] leading-relaxed break-all whitespace-pre-line text-emerald-800 dark:text-slate-350">
-                              <span className="font-bold font-sans text-[10px] text-amber-600 block mb-1">STUDENT ANSWER WORKSHEET:</span>
-                              {sub.submissionContent}
+                            <div className="bg-white dark:bg-emerald-950 p-4 rounded-lg border border-emerald-100 dark:border-emerald-850 text-xs leading-relaxed text-emerald-800 dark:text-slate-350 space-y-3">
+                              <span className="font-bold font-sans text-[10px] text-amber-600 block uppercase">STUDENT ANSWER WORKSHEET & MEDIA ATTACHMENTS:</span>
+                              {(() => {
+                                try {
+                                  if (sub.submissionContent.startsWith("{") && sub.submissionContent.endsWith("}")) {
+                                    const parsed = JSON.parse(sub.submissionContent);
+                                    
+                                    // If it's a quiz or exam, or has numeric choices (not text/photos/audio)
+                                    if (sub.type === "quiz" || sub.type === "exam" || (!parsed.text && !parsed.photos && !parsed.audio)) {
+                                      const courseObj = courses.find(c => c.id === sub.courseId);
+                                      const quizObj = courseObj?.quizzes.find(q => q.id === sub.referenceId);
+                                      
+                                      if (quizObj && quizObj.questions) {
+                                        let correctCount = 0;
+                                        quizObj.questions.forEach((q) => {
+                                          if (parsed[q.id] === q.correctAnswerIndex) {
+                                            correctCount++;
+                                          }
+                                        });
+                                        
+                                        return (
+                                          <div className="space-y-4">
+                                            <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-200/50 flex justify-between items-center text-xs">
+                                              <div>
+                                                <span className="font-bold text-emerald-950 dark:text-emerald-100">📋 {quizObj.title}</span>
+                                                <span className="text-[10px] text-slate-400 block mt-0.5">Total Questions: {quizObj.questions.length} Questions</span>
+                                              </div>
+                                              <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                                                Score: {correctCount} / {quizObj.questions.length} Correct ({Math.round((correctCount / quizObj.questions.length) * 100)}%)
+                                              </span>
+                                            </div>
+                                            
+                                            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                                              {quizObj.questions.map((q, idx) => {
+                                                const studentChoice = parsed[q.id];
+                                                const isCorrect = studentChoice === q.correctAnswerIndex;
+                                                return (
+                                                  <div key={idx} className={`p-3 rounded-lg border text-xs ${
+                                                    isCorrect 
+                                                      ? "bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50" 
+                                                      : "bg-red-50/10 dark:bg-red-950/15 border-red-100/40 dark:border-red-900/30"
+                                                  }`}>
+                                                    <div className="font-semibold flex items-start gap-1.5 text-emerald-950 dark:text-white">
+                                                      <span>{idx + 1}.</span>
+                                                      <span>{q.questionText}</span>
+                                                      {studentChoice !== undefined ? (
+                                                        isCorrect ? (
+                                                          <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-auto shrink-0">✓ Correct</span>
+                                                        ) : (
+                                                          <span className="text-red-550 dark:text-red-400 font-bold ml-auto shrink-0">✗ Incorrect</span>
+                                                        )
+                                                      ) : (
+                                                        <span className="text-slate-400 font-bold ml-auto shrink-0">Unanswered</span>
+                                                      )}
+                                                    </div>
+                                                    
+                                                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-4">
+                                                      {q.options.map((opt, oIdx) => {
+                                                        const isChosen = studentChoice === oIdx;
+                                                        const isCorrectOpt = q.correctAnswerIndex === oIdx;
+                                                        return (
+                                                          <div key={oIdx} className={`p-1.5 rounded text-[11px] border ${
+                                                            isCorrectOpt
+                                                              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 font-medium"
+                                                              : isChosen
+                                                                ? "bg-red-500/15 border-red-500/30 text-red-700 dark:text-red-400"
+                                                                : "bg-slate-50/50 dark:bg-slate-900/20 border-slate-100 dark:border-slate-800/50 text-slate-550 dark:text-slate-400"
+                                                          }`}>
+                                                            <div className="flex items-center gap-1.5">
+                                                              <span className="font-mono text-[9px] text-slate-400">({String.fromCharCode(65 + oIdx)})</span>
+                                                              <span>{opt}</span>
+                                                              {isChosen && <span className="text-[8px] uppercase px-1 py-0.1 bg-slate-200 dark:bg-slate-800 rounded font-bold font-mono shrink-0 font-bold">Chosen</span>}
+                                                            </div>
+                                                          </div>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        );
+                                      } else {
+                                        return (
+                                          <div className="space-y-1 bg-slate-50 dark:bg-emerald-950/20 p-3 rounded border border-slate-200">
+                                            <span className="font-bold text-amber-600 block uppercase font-mono text-[10px]">CBT Quiz Submissions:</span>
+                                            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                                              {Object.entries(parsed).map(([qKey, val]) => (
+                                                <div key={qKey} className="p-1 bg-white dark:bg-emerald-950 rounded border">
+                                                  <span className="text-emerald-700">Question {qKey}:</span> Option Index {String(val)}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                    }
+
+                                    const rich = parsed;
+                                    return (
+                                      <div className="space-y-4">
+                                        {rich.text && (
+                                          <div className="whitespace-pre-wrap font-serif text-xs bg-emerald-50/20 dark:bg-emerald-950/40 p-3 rounded border border-emerald-100/40 text-emerald-900 dark:text-emerald-105">
+                                            {rich.text}
+                                          </div>
+                                        )}
+                                        
+                                        {rich.photos && rich.photos.length > 0 && (
+                                          <div className="space-y-1.5">
+                                            <span className="font-bold text-[10px] text-emerald-700 dark:text-emerald-300 block">Uploaded Photos ({rich.photos.length}):</span>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                                              {rich.photos.map((src: string, idx: number) => (
+                                                <a key={idx} href={src} target="_blank" rel="noopener noreferrer" className="relative group block rounded border border-emerald-100 overflow-hidden bg-slate-50 aspect-square">
+                                                  <img src={src} alt={`Attachment ${idx + 1}`} className="w-full h-full object-cover" />
+                                                  <span className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold">Zoom Page</span>
+                                                </a>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {rich.audio && (
+                                          <div className="space-y-1.5 bg-emerald-50/10 dark:bg-emerald-950/40 p-2.5 rounded border border-emerald-100/50">
+                                            <span className="font-bold text-[10px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                                              <span>🎙️ Recorded Voice Note / Student Explanation:</span>
+                                            </span>
+                                            <audio src={rich.audio} controls className="w-full h-8 mt-1 text-xs" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                } catch (err) {}
+                                
+                                // Fallback to plain text
+                                return <div className="break-all font-mono text-[11px] whitespace-pre-wrap">{sub.submissionContent}</div>;
+                              })()}
                             </div>
 
                             {gradingSubmission?.id === sub.id ? (
@@ -5004,7 +5760,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         ))}
 
                         {/* Graded History */}
-                        {gradingFilter === "graded" && submissions.filter(s => s.status === "graded").map((sub) => (
+                        {gradingFilter === "graded" && submissions
+                          .filter(s => s.status === "graded")
+                          .filter(s => gradingTypeFilter === "all" || s.type === gradingTypeFilter)
+                          .filter(s => {
+                            if (!gradingSearchText) return true;
+                            const q = gradingSearchText.toLowerCase();
+                            return s.studentName.toLowerCase().includes(q) ||
+                                   s.courseTitle.toLowerCase().includes(q) ||
+                                   (s.referenceTitle || "").toLowerCase().includes(q);
+                          })
+                          .map((sub) => (
                           <div key={sub.id} className="p-4 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-900/40 rounded-xl space-y-3 text-xs text-emerald-950 dark:text-white">
                             <div className="flex justify-between items-start border-b border-emerald-50 dark:border-emerald-900/30 pb-2">
                               <div>
@@ -5056,6 +5822,146 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               </form>
                             ) : (
                               <>
+                                <div className="bg-slate-50 dark:bg-emerald-950/40 p-3 rounded-lg border border-slate-200/50 dark:border-emerald-900/30 text-xs leading-relaxed space-y-3 mb-3">
+                                  <span className="font-bold font-sans text-[10px] text-slate-500 block uppercase">Student Submission:</span>
+                                  {(() => {
+                                    try {
+                                      if (sub.submissionContent.startsWith("{") && sub.submissionContent.endsWith("}")) {
+                                        const parsed = JSON.parse(sub.submissionContent);
+                                        
+                                        // If it's a quiz or exam, or has numeric choices (not text/photos/audio)
+                                        if (sub.type === "quiz" || sub.type === "exam" || (!parsed.text && !parsed.photos && !parsed.audio)) {
+                                          const courseObj = courses.find(c => c.id === sub.courseId);
+                                          const quizObj = courseObj?.quizzes.find(q => q.id === sub.referenceId);
+                                          
+                                          if (quizObj && quizObj.questions) {
+                                            let correctCount = 0;
+                                            quizObj.questions.forEach((q) => {
+                                              if (parsed[q.id] === q.correctAnswerIndex) {
+                                                correctCount++;
+                                              }
+                                            });
+                                            
+                                            return (
+                                              <div className="space-y-4">
+                                                <div className="p-3 bg-white dark:bg-emerald-950 rounded-lg border flex justify-between items-center text-xs">
+                                                  <div>
+                                                    <span className="font-bold text-emerald-950 dark:text-emerald-100">📋 {quizObj.title}</span>
+                                                    <span className="text-[10px] text-slate-400 block mt-0.5">Total Questions: {quizObj.questions.length} Questions</span>
+                                                  </div>
+                                                  <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                                                    Score: {correctCount} / {quizObj.questions.length} Correct ({Math.round((correctCount / quizObj.questions.length) * 100)}%)
+                                                  </span>
+                                                </div>
+                                                
+                                                <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                                                  {quizObj.questions.map((q, idx) => {
+                                                    const studentChoice = parsed[q.id];
+                                                    const isCorrect = studentChoice === q.correctAnswerIndex;
+                                                    return (
+                                                      <div key={idx} className={`p-3 rounded-lg border text-xs ${
+                                                        isCorrect 
+                                                          ? "bg-emerald-50/20 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50" 
+                                                          : "bg-red-50/10 dark:bg-red-950/15 border-red-100/40 dark:border-red-900/30"
+                                                      }`}>
+                                                        <div className="font-semibold flex items-start gap-1.5 text-emerald-950 dark:text-white">
+                                                          <span>{idx + 1}.</span>
+                                                          <span>{q.questionText}</span>
+                                                          {studentChoice !== undefined ? (
+                                                            isCorrect ? (
+                                                              <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-auto shrink-0 font-bold">✓ Correct</span>
+                                                            ) : (
+                                                              <span className="text-red-550 dark:text-red-400 font-bold ml-auto shrink-0 font-bold">✗ Incorrect</span>
+                                                            )
+                                                          ) : (
+                                                            <span className="text-slate-400 font-bold ml-auto shrink-0">Unanswered</span>
+                                                          )}
+                                                        </div>
+                                                        
+                                                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5 pl-4">
+                                                          {q.options.map((opt, oIdx) => {
+                                                            const isChosen = studentChoice === oIdx;
+                                                            const isCorrectOpt = q.correctAnswerIndex === oIdx;
+                                                            return (
+                                                              <div key={oIdx} className={`p-1.5 rounded text-[11px] border ${
+                                                                isCorrectOpt
+                                                                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300 font-medium"
+                                                                  : isChosen
+                                                                    ? "bg-red-500/15 border-red-500/30 text-red-700 dark:text-red-400"
+                                                                    : "bg-slate-50/50 dark:bg-slate-900/20 border-slate-100 dark:border-slate-800/50 text-slate-550 dark:text-slate-400"
+                                                              }`}>
+                                                                <div className="flex items-center gap-1.5">
+                                                                  <span className="font-mono text-[9px] text-slate-400">({String.fromCharCode(65 + oIdx)})</span>
+                                                                  <span>{opt}</span>
+                                                                  {isChosen && <span className="text-[8px] uppercase px-1 py-0.1 bg-slate-200 dark:bg-slate-800 rounded font-bold font-mono shrink-0">Chosen</span>}
+                                                                </div>
+                                                              </div>
+                                                            );
+                                                          })}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            );
+                                          } else {
+                                            return (
+                                              <div className="space-y-1 bg-slate-50 dark:bg-emerald-950/20 p-3 rounded border border-slate-200">
+                                                <span className="font-bold text-amber-600 block uppercase font-mono text-[10px]">CBT Quiz Submissions:</span>
+                                                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                                                  {Object.entries(parsed).map(([qKey, val]) => (
+                                                    <div key={qKey} className="p-1 bg-white dark:bg-emerald-950 rounded border">
+                                                      <span className="text-emerald-700">Question {qKey}:</span> Option Index {String(val)}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            );
+                                          }
+                                        }
+
+                                        const rich = parsed;
+                                        return (
+                                          <div className="space-y-3">
+                                            {rich.text && (
+                                              <div className="whitespace-pre-wrap font-serif text-xs bg-white dark:bg-emerald-950/50 p-2 rounded border border-slate-100 text-emerald-900 dark:text-emerald-100 font-normal">
+                                                {rich.text}
+                                              </div>
+                                            )}
+                                            
+                                            {rich.photos && rich.photos.length > 0 && (
+                                              <div className="space-y-1">
+                                                <span className="font-bold text-[9px] text-slate-500 block">Uploaded Photos ({rich.photos.length}):</span>
+                                                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                                  {rich.photos.map((src: string, idx: number) => (
+                                                    <a key={idx} href={src} target="_blank" rel="noopener noreferrer" className="relative group block rounded border border-slate-200 overflow-hidden bg-white aspect-square">
+                                                      <img src={src} alt={`Attachment ${idx + 1}`} className="w-full h-full object-cover" />
+                                                      <span className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[8px] font-bold">Zoom</span>
+                                                    </a>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                            
+                                            {rich.audio && (
+                                              <div className="space-y-1 bg-white dark:bg-emerald-950/40 p-2 rounded border border-slate-200/50">
+                                                <span className="font-bold text-[9px] text-slate-500 flex items-center gap-1">
+                                                  <span>🎙️ Recorded Voice Note / Audio:</span>
+                                                </span>
+                                                <audio src={rich.audio} controls className="w-full h-8 mt-1 text-xs" />
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                    } catch (err) {}
+                                    
+                                    // Fallback to plain text
+                                    return <div className="break-all font-mono text-[10px] whitespace-pre-wrap">{sub.submissionContent}</div>;
+                                  })()}
+                                </div>
+
                                 <div className="bg-emerald-50/50 dark:bg-emerald-900/20 p-2.5 rounded text-[11px] font-sans italic text-emerald-800 dark:text-slate-300 border border-emerald-100/50 dark:border-emerald-900/30">
                                   <span className="font-bold font-mono text-[9px] text-amber-600 block uppercase not-italic font-sans">Teacher Remarks:</span>
                                   "{sub.comments || "Good effort. Keep up the high level work."}" — graded by {sub.gradedBy || "System Auto-Mark"}
@@ -5089,14 +5995,40 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         ))}
 
                         {/* Empty states */}
-                        {gradingFilter === "pending" && submissions.filter(s => s.status === "pending").length === 0 && (
+                        {gradingFilter === "pending" && submissions
+                          .filter(s => s.status === "pending")
+                          .filter(s => gradingTypeFilter === "all" || s.type === gradingTypeFilter)
+                          .filter(s => {
+                            if (!gradingSearchText) return true;
+                            const q = gradingSearchText.toLowerCase();
+                            return s.studentName.toLowerCase().includes(q) ||
+                                   s.courseTitle.toLowerCase().includes(q) ||
+                                   (s.referenceTitle || "").toLowerCase().includes(q);
+                          }).length === 0 && (
                           <div className="text-center py-12 bg-emerald-50/10 rounded-xl border border-dashed border-emerald-200">
-                            <p className="text-xs text-slate-400 italic font-serif">No pending student worksheets to grade. Alhamdulillah, you are all caught up!</p>
+                            <p className="text-xs text-slate-400 italic font-serif">
+                              {gradingSearchText || gradingTypeFilter !== "all" 
+                                ? "No pending worksheets matched your search filters."
+                                : "No pending student worksheets to grade. Alhamdulillah, you are all caught up!"}
+                            </p>
                           </div>
                         )}
-                        {gradingFilter === "graded" && submissions.filter(s => s.status === "graded").length === 0 && (
+                        {gradingFilter === "graded" && submissions
+                          .filter(s => s.status === "graded")
+                          .filter(s => gradingTypeFilter === "all" || s.type === gradingTypeFilter)
+                          .filter(s => {
+                            if (!gradingSearchText) return true;
+                            const q = gradingSearchText.toLowerCase();
+                            return s.studentName.toLowerCase().includes(q) ||
+                                   s.courseTitle.toLowerCase().includes(q) ||
+                                   (s.referenceTitle || "").toLowerCase().includes(q);
+                          }).length === 0 && (
                           <div className="text-center py-12 bg-emerald-50/10 rounded-xl border border-dashed border-emerald-200">
-                            <p className="text-xs text-slate-400 italic font-serif">No historical graded sheets recorded.</p>
+                            <p className="text-xs text-slate-400 italic font-serif">
+                              {gradingSearchText || gradingTypeFilter !== "all" 
+                                ? "No graded records matched your search filters."
+                                : "No historical graded sheets recorded."}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -5347,13 +6279,35 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 </h4>
                                 <div className="space-y-2">
                                   {activeCourse.videos.map((vid) => (
-                                    <div key={vid.id} className="p-3 bg-emerald-50/20 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-lg flex justify-between items-center text-xs animate-fade-in">
-                                      <div>
-                                        <div className="font-semibold text-emerald-950 dark:text-white">◈ {vid.title}</div>
-                                        <div className="text-[10px] text-slate-400 line-clamp-1">{vid.description}</div>
-                                        <div className="text-[9px] font-mono text-amber-600 font-bold mt-0.5">Duration: {vid.duration}</div>
+                                    <div key={vid.id} className="p-3 bg-emerald-50/20 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fade-in">
+                                      <div className="space-y-1 flex-1">
+                                        <div className="font-semibold text-emerald-950 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                          <span>◈ {vid.title}</span>
+                                          {(vid.audioUrl || (vid.photos && vid.photos.length > 0)) && (
+                                            <span className="text-[8px] bg-amber-500/20 text-amber-750 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider font-mono">Audio & Slides</span>
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400">{vid.description}</div>
+                                        <div className="text-[9px] font-mono text-amber-600 font-bold">Duration: {vid.duration || "Audio Lecture"}</div>
+                                        
+                                        {/* Audio preview for teacher */}
+                                        {vid.audioUrl && (
+                                          <div className="mt-1.5 p-1.5 bg-white dark:bg-emerald-950/40 rounded border border-emerald-100/40 max-w-md">
+                                            <span className="text-[8px] font-semibold text-emerald-700 uppercase block mb-0.5">🎙️ Lecture Audio:</span>
+                                            <audio src={vid.audioUrl} controls className="w-full h-6" />
+                                          </div>
+                                        )}
+
+                                        {/* Slides preview for teacher */}
+                                        {vid.photos && vid.photos.length > 0 && (
+                                          <div className="mt-1.5 flex gap-1 overflow-x-auto py-1">
+                                            {vid.photos.map((ph, phIdx) => (
+                                              <img key={phIdx} src={ph} alt="board slide" className="w-10 h-10 object-cover rounded border border-emerald-100/40" />
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
-                                      <div className="flex items-center gap-1.5">
+                                      <div className="flex items-center gap-1.5 self-end sm:self-center">
                                         <button
                                           onClick={() => handleStartEditMaterial(activeCourse.id, "video", vid)}
                                           className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-700 dark:text-emerald-300 rounded cursor-pointer transition-all border border-transparent"
@@ -5782,15 +6736,109 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 </div>
 
                                 {matType === "video" && (
-                                  <div className="space-y-1 animate-fade-in">
-                                    <span className="font-bold text-emerald-700 block uppercase font-mono text-[9px]">YouTube IFrame Embed URL</span>
-                                    <input
-                                      type="url"
-                                      placeholder="https://www.youtube.com/embed/..."
-                                      value={matUrl}
-                                      onChange={(e) => setMatUrl(e.target.value)}
-                                      className="p-2.5 border border-emerald-200 dark:border-emerald-800 rounded w-full bg-emerald-50/20 dark:bg-emerald-950 focus:outline-none text-emerald-950 dark:text-white font-mono text-xs"
-                                    />
+                                  <div className="space-y-4 border border-emerald-100 dark:border-emerald-800 p-3.5 rounded-lg bg-emerald-50/10 dark:bg-emerald-950/20">
+                                    <div className="flex justify-between items-center pb-2 border-b border-emerald-50 dark:border-emerald-850">
+                                      <span className="font-bold text-emerald-900 dark:text-amber-100 uppercase tracking-wider text-[10px] block">Lecture Delivery Options</span>
+                                    </div>
+                                    
+                                    {/* Video URL Option */}
+                                    <div className="space-y-1">
+                                      <span className="font-semibold text-emerald-700 block uppercase font-mono text-[9px]">Option A: YouTube Embed URL (Optional)</span>
+                                      <input
+                                        type="url"
+                                        placeholder="https://www.youtube.com/embed/..."
+                                        value={matUrl}
+                                        onChange={(e) => setMatUrl(e.target.value)}
+                                        className="p-2.5 border border-emerald-200 dark:border-emerald-800 rounded w-full bg-emerald-50/20 dark:bg-emerald-950 focus:outline-none text-emerald-950 dark:text-white font-mono text-xs"
+                                      />
+                                    </div>
+
+                                    {/* Voice note recorder option */}
+                                    <div className="space-y-2 pt-2 border-t border-emerald-100/50 dark:border-emerald-800/50">
+                                      <span className="font-semibold text-emerald-700 block uppercase font-mono text-[9px]">Option B: Record Lecture Voice Note / Audio Explanation</span>
+                                      
+                                      <div className="flex flex-wrap gap-2 items-center">
+                                        {!isRecordingMat ? (
+                                          <button
+                                            type="button"
+                                            onClick={startRecordingMat}
+                                            className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-[10px] flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                          >
+                                            <span>🎙️ Start Audio Recording</span>
+                                          </button>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={stopRecordingMat}
+                                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded text-[10px] flex items-center gap-1.5 cursor-pointer shadow-sm animate-pulse"
+                                          >
+                                            <span>🛑 Stop Recording ({recordingMatSeconds}s)</span>
+                                          </button>
+                                        )}
+
+                                        {matAudioUrl && (
+                                          <button
+                                            type="button"
+                                            onClick={deleteRecordingMat}
+                                            className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded text-[10px] flex items-center gap-1 cursor-pointer"
+                                          >
+                                            <span>Delete Audio</span>
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      {matAudioUrl && (
+                                        <div className="p-2 bg-white dark:bg-emerald-950 rounded border border-emerald-100 mt-1">
+                                          <span className="text-[9px] font-bold text-amber-600 block mb-1">🎧 Preview Audio Lecture:</span>
+                                          <audio src={matAudioUrl} controls className="w-full h-8" />
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Multiple slide photos option */}
+                                    <div className="space-y-2 pt-2 border-t border-emerald-100/50 dark:border-emerald-800/50">
+                                      <span className="font-semibold text-emerald-700 block uppercase font-mono text-[9px]">Option C: Upload Board Slides / Textbook Pictures</span>
+                                      
+                                      <label className="flex flex-col items-center justify-center border-2 border-dashed border-emerald-200 dark:border-emerald-800 hover:bg-emerald-500/5 dark:hover:bg-emerald-950/30 rounded-lg p-3 cursor-pointer transition-all">
+                                        <span className="text-[10px] text-emerald-600 font-bold">📸 Click to upload board images</span>
+                                        <input
+                                          type="file"
+                                          multiple
+                                          accept="image/*"
+                                          onChange={handleMatPhotosChange}
+                                          className="hidden"
+                                        />
+                                      </label>
+
+                                      {matPhotos.length > 0 && (
+                                        <div className="space-y-1.5">
+                                          <div className="flex justify-between items-center">
+                                            <span className="font-bold text-[9px] text-slate-500">Board Slide Photos ({matPhotos.length}):</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => setMatPhotos([])}
+                                              className="text-[9px] text-red-500 hover:underline font-bold cursor-pointer"
+                                            >
+                                              Clear All Photos
+                                            </button>
+                                          </div>
+                                          <div className="grid grid-cols-4 gap-1.5">
+                                            {matPhotos.map((src, pIdx) => (
+                                              <div key={pIdx} className="relative aspect-square border border-emerald-100/60 rounded overflow-hidden">
+                                                <img src={src} alt="Board preview" className="w-full h-full object-cover" />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setMatPhotos(prev => prev.filter((_, i) => i !== pIdx))}
+                                                  className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center text-[8px] font-bold cursor-pointer"
+                                                >
+                                                  ×
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
 
@@ -5809,11 +6857,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                                 <div className="space-y-1">
                                   <span className="font-bold text-emerald-700 block uppercase font-mono text-[9px]">
-                                    {matType === "video" ? "Duration Time (e.g. 25:15)" : matType === "pdf" ? "File Size (e.g. 3.2 MB)" : "Max Points Value (e.g. 50)"}
+                                    {matType === "video" ? "Duration Time (e.g. 25:15 / Audio Lecture)" : matType === "pdf" ? "File Size (e.g. 3.2 MB)" : "Max Points Value (e.g. 50)"}
                                   </span>
                                   <input
                                     type="text"
-                                    required
                                     placeholder={matType === "video" ? "e.g. 18:40" : matType === "pdf" ? "e.g. 2.1 MB" : "e.g. 50"}
                                     value={matDurationOrSize}
                                     onChange={(e) => setMatDurationOrSize(e.target.value)}
@@ -7235,6 +8282,175 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           </div>
                         </div>
 
+                        {/* Featured Programs / Courses */}
+                        <div className="space-y-4 border-t border-emerald-50 dark:border-emerald-900/35 pt-6">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="font-bold text-emerald-950 dark:text-amber-100 text-sm flex items-center gap-1.5">
+                                <span>💎 Featured Madrasah Programs / Courses</span>
+                              </h4>
+                              <p className="text-[10px] text-slate-400">
+                                These programs are displayed as cards on the public homepage.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setCurrFeaturedCourses([...currFeaturedCourses, { id: "feat-" + Date.now(), level: "Beginner", titleEn: "", titleAr: "", teacherEn: "", teacherAr: "", duration: "6 Weeks", descEn: "", descAr: "" }])}
+                              className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 font-bold rounded-full text-[11px] cursor-pointer flex items-center gap-1"
+                            >
+                              ＋ Add Featured Card
+                            </button>
+                          </div>
+
+                          {currFeaturedCourses.length === 0 ? (
+                            <div className="p-4 border border-dashed border-emerald-200 dark:border-emerald-800 rounded-2xl text-center text-slate-400">
+                              No featured programs currently set. Add one to override the default landing page cards.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {currFeaturedCourses.map((fc, fcIdx) => (
+                                <div key={fc.id || fcIdx} className="p-5 bg-amber-50/10 dark:bg-amber-950/10 border border-amber-100/30 dark:border-amber-900/20 rounded-2xl space-y-4 relative">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCurrFeaturedCourses(currFeaturedCourses.filter((_, i) => i !== fcIdx))}
+                                    className="absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold cursor-pointer text-xs"
+                                  >
+                                    × Remove
+                                  </button>
+                                  <span className="text-[10px] text-amber-600 dark:text-amber-350 font-mono font-bold uppercase tracking-wider">Featured Card #{fcIdx + 1}</span>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <span className="font-bold text-emerald-700 dark:text-amber-100 block uppercase text-[9px]">Class Level / Category</span>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Beginner, Intermediate..."
+                                        value={fc.level || ""}
+                                        onChange={(e) => {
+                                          const updated = [...currFeaturedCourses];
+                                          updated[fcIdx].level = e.target.value;
+                                          setCurrFeaturedCourses(updated);
+                                        }}
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="font-bold text-emerald-700 dark:text-amber-100 block uppercase text-[9px]">Duration / Term</span>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. 6 Weeks, 8 Weeks..."
+                                        value={fc.duration || ""}
+                                        onChange={(e) => {
+                                          const updated = [...currFeaturedCourses];
+                                          updated[fcIdx].duration = e.target.value;
+                                          setCurrFeaturedCourses(updated);
+                                        }}
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <span className="font-bold text-emerald-700 dark:text-amber-100 block uppercase text-[9px]">Program Title (English)</span>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Introduction to Arabic Alphabet"
+                                        value={fc.titleEn || ""}
+                                        onChange={(e) => {
+                                          const updated = [...currFeaturedCourses];
+                                          updated[fcIdx].titleEn = e.target.value;
+                                          setCurrFeaturedCourses(updated);
+                                        }}
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="font-bold text-emerald-700 dark:text-amber-100 block uppercase text-[9px]">Program Title (Arabic)</span>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. مقدمة الحروف العربية"
+                                        value={fc.titleAr || ""}
+                                        onChange={(e) => {
+                                          const updated = [...currFeaturedCourses];
+                                          updated[fcIdx].titleAr = e.target.value;
+                                          setCurrFeaturedCourses(updated);
+                                        }}
+                                        dir="rtl"
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-right font-serif text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <span className="font-bold text-emerald-700 dark:text-amber-100 block uppercase text-[9px]">Instructor / Shaykh (English)</span>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Shaykh Ahmed Al-Misri"
+                                        value={fc.teacherEn || ""}
+                                        onChange={(e) => {
+                                          const updated = [...currFeaturedCourses];
+                                          updated[fcIdx].teacherEn = e.target.value;
+                                          setCurrFeaturedCourses(updated);
+                                        }}
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="font-bold text-emerald-700 dark:text-amber-100 block uppercase text-[9px]">Instructor / Shaykh (Arabic)</span>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. الشيخ أحمد المصري"
+                                        value={fc.teacherAr || ""}
+                                        onChange={(e) => {
+                                          const updated = [...currFeaturedCourses];
+                                          updated[fcIdx].teacherAr = e.target.value;
+                                          setCurrFeaturedCourses(updated);
+                                        }}
+                                        dir="rtl"
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-right font-serif text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <span className="font-bold text-emerald-700 dark:text-amber-100 block uppercase text-[9px]">Description (English)</span>
+                                      <textarea
+                                        rows={2}
+                                        placeholder="Brief description..."
+                                        value={fc.descEn || ""}
+                                        onChange={(e) => {
+                                          const updated = [...currFeaturedCourses];
+                                          updated[fcIdx].descEn = e.target.value;
+                                          setCurrFeaturedCourses(updated);
+                                        }}
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <span className="font-bold text-emerald-700 dark:text-amber-100 block uppercase text-[9px]">Description (Arabic)</span>
+                                      <textarea
+                                        rows={2}
+                                        placeholder="الوصف المختصر..."
+                                        value={fc.descAr || ""}
+                                        onChange={(e) => {
+                                          const updated = [...currFeaturedCourses];
+                                          updated[fcIdx].descAr = e.target.value;
+                                          setCurrFeaturedCourses(updated);
+                                        }}
+                                        dir="rtl"
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-right font-serif text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                         <button
                           type="submit"
                           disabled={currSaving}
@@ -7268,7 +8484,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       <form onSubmit={handleSaveSermon} className="p-4 bg-emerald-50/10 dark:bg-emerald-950/10 border border-emerald-50 dark:border-emerald-900/25 rounded-2xl space-y-4 text-xs">
                         <h4 className="font-bold text-emerald-900 dark:text-amber-100 text-xs uppercase tracking-wider">Add New Video Sermon to Playlist</h4>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div className="space-y-1">
                             <span className="font-bold text-emerald-700 block">Sermon Title</span>
                             <input
@@ -7280,7 +8496,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             />
                           </div>
                           <div className="space-y-1">
-                            <span className="font-bold text-emerald-700 block">YouTube Embed / Stream URL</span>
+                            <span className="font-bold text-emerald-700 block">YouTube Embed URL / Audio Stream URL</span>
                             <input
                               type="text"
                               placeholder="https://www.youtube.com/embed/8I869l_5mYg"
@@ -7288,6 +8504,78 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               onChange={(e) => setNewSermonUrl(e.target.value)}
                               className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
                             />
+                          </div>
+                          <div className="space-y-1">
+                            <span className="font-bold text-emerald-700 block">Sermon Cover / Thumbnail Image</span>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Image URL..."
+                                value={newSermonCoverUrl}
+                                onChange={(e) => setNewSermonCoverUrl(e.target.value)}
+                                className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                              />
+                              <div className="relative shrink-0">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleSermonCoverUpload}
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                />
+                                <button type="button" className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer">
+                                  Upload
+                                </button>
+                              </div>
+                            </div>
+                            {newSermonCoverUrl && (
+                              <img src={newSermonCoverUrl} alt="Sermon Thumbnail" className="h-10 w-16 object-cover rounded mt-1.5 border border-emerald-100" />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Live Recording Widget */}
+                        <div className="p-4 bg-emerald-50/5 dark:bg-emerald-950/20 rounded-2xl border border-dashed border-emerald-100 dark:border-emerald-800/45 space-y-2.5">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-emerald-900 dark:text-amber-100 flex items-center gap-1.5">
+                              <span>🎙️ Audio Sermon Recording Studio</span>
+                            </span>
+                            {audioBlobUrlSermon && (
+                              <button
+                                type="button"
+                                onClick={cancelSermonRecording}
+                                className="text-[10px] text-red-600 hover:underline font-bold cursor-pointer"
+                              >
+                                Clear Recording
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {!isRecordingSermon ? (
+                              <button
+                                type="button"
+                                onClick={startSermonRecording}
+                                className="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              >
+                                <span>🔴 Start Microphone Recording</span>
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={stopSermonRecording}
+                                  className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer animate-pulse shadow-xs"
+                                >
+                                  <span>⏹️ Stop Recording ({Math.floor(recordingSecondsSermon / 60)}:{(recordingSecondsSermon % 60).toString().padStart(2, "0")})</span>
+                                </button>
+                                <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
+                              </div>
+                            )}
+
+                            {audioBlobUrlSermon && (
+                              <div className="flex-1 min-w-[200px]">
+                                <audio src={audioBlobUrlSermon} controls className="w-full h-8" />
+                              </div>
+                            )}
                           </div>
                         </div>
 
