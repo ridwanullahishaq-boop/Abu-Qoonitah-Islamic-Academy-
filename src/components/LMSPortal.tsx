@@ -172,6 +172,7 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [tuitionPayType, setTuitionPayType] = useState<'monthly' | 'semester'>('semester');
   const [activeCertificate, setActiveCertificate] = useState<"beginner" | "intermediate" | "free" | null>(null);
   const [calendarSemester, setCalendarSemester] = useState<"semester1" | "semester2">("semester1");
+  const [selectedReportSemester, setSelectedReportSemester] = useState<1 | 2>(1);
 
   // Assignment upload states
   const [activeAssign, setActiveAssign] = useState<any | null>(null);
@@ -277,6 +278,8 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [fcImageUrl, setFcImageUrl] = useState("");
   const [fcVerses, setFcVerses] = useState<{ arabic: string; translation: string }[]>([]);
   const [fcAudioFiles, setFcAudioFiles] = useState<{ id: string; title: string; url: string; description: string }[]>([]);
+  const [fcQuestions, setFcQuestions] = useState<{ id: string; question: string; options: string[]; correctIndex: number }[]>([]);
+  const [fcPassingScore, setFcPassingScore] = useState<number>(4);
   const [fcSaving, setFcSaving] = useState(false);
   const [fcMessage, setFcMessage] = useState("");
   const [fcEnrollments, setFcEnrollments] = useState<any[]>([]);
@@ -558,6 +561,8 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
             }
             setFcVerses(verses);
             setFcAudioFiles(data.audioFiles || []);
+            setFcQuestions(data.questions || []);
+            setFcPassingScore(data.passingScore || 4);
           }
         })
         .catch((err) => console.error(err));
@@ -1718,7 +1723,9 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
       imageUrl: fcImageUrl,
       poemArabicText: fcVerses.map(v => v.arabic),
       poemTranslationText: fcVerses.map(v => v.translation),
-      audioFiles: fcAudioFiles
+      audioFiles: fcAudioFiles,
+      questions: fcQuestions,
+      passingScore: fcPassingScore
     };
 
     fetch("/api/admin/free-course", {
@@ -8001,6 +8008,116 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 </div>
                               </div>
                             ))}
+                          </div>
+                        </div>
+
+                        {/* Graduation CBT settings */}
+                        <div className="space-y-4 border-t border-emerald-50 dark:border-emerald-900/35 pt-4 text-left">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="font-bold text-emerald-950 dark:text-amber-100 text-sm">Graduation CBT Exam Settings</h4>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Customize the exam required to graduate from this free module and unlock certificates.</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setFcQuestions([...fcQuestions, { id: "q-" + Date.now(), question: "", options: ["", "", "", ""], correctIndex: 0 }])}
+                              className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold rounded-full text-xs cursor-pointer"
+                            >
+                              ＋ Add Question
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-emerald-50/15 dark:bg-emerald-950/15 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800">
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 block uppercase tracking-wider text-[9px]">Passing Requirement Score</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={Math.max(1, fcQuestions.length)}
+                                  value={fcPassingScore}
+                                  onChange={(e) => setFcPassingScore(parseInt(e.target.value) || 1)}
+                                  className="w-20 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs font-bold text-center text-emerald-950 dark:text-white"
+                                />
+                                <span className="text-[11px] text-slate-500">
+                                  correct answers out of {fcQuestions.length} questions
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            {fcQuestions.map((q, qIdx) => (
+                              <div key={q.id || qIdx} className="p-4 bg-emerald-50/10 dark:bg-emerald-950/10 border border-emerald-50 dark:border-emerald-900/20 rounded-xl space-y-3 relative text-left">
+                                <button
+                                  type="button"
+                                  onClick={() => setFcQuestions(fcQuestions.filter((_, i) => i !== qIdx))}
+                                  className="absolute top-2 right-2 text-red-500 hover:text-red-700 font-bold cursor-pointer text-xs"
+                                >
+                                  × Remove
+                                </button>
+                                <span className="text-[10px] text-slate-400 font-mono font-bold block">Question #{qIdx + 1}</span>
+                                
+                                <div className="space-y-1">
+                                  <span className="font-bold text-emerald-700 block uppercase text-[9px]">Question Text</span>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Who is the author of Laamiyyatu Ibn Taimiyyah?"
+                                    value={q.question || ""}
+                                    onChange={(e) => {
+                                      const updated = [...fcQuestions];
+                                      updated[qIdx].question = e.target.value;
+                                      setFcQuestions(updated);
+                                    }}
+                                    required
+                                    className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
+                                  {q.options.map((opt, optIdx) => (
+                                    <div key={optIdx} className="space-y-1">
+                                      <span className="font-bold text-slate-550 block uppercase text-[8px]">Option {String.fromCharCode(65 + optIdx)}</span>
+                                      <input
+                                        type="text"
+                                        placeholder={`Answer Option ${optIdx + 1}...`}
+                                        value={opt || ""}
+                                        onChange={(e) => {
+                                          const updated = [...fcQuestions];
+                                          updated[qIdx].options[optIdx] = e.target.value;
+                                          setFcQuestions(updated);
+                                        }}
+                                        required
+                                        className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="space-y-1 max-w-xs text-left">
+                                  <span className="font-bold text-emerald-700 block uppercase text-[9px]">Correct Answer Index</span>
+                                  <select
+                                    value={q.correctIndex}
+                                    onChange={(e) => {
+                                      const updated = [...fcQuestions];
+                                      updated[qIdx].correctIndex = parseInt(e.target.value);
+                                      setFcQuestions(updated);
+                                    }}
+                                    className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
+                                  >
+                                    <option value={0}>Option A</option>
+                                    <option value={1}>Option B</option>
+                                    <option value={2}>Option C</option>
+                                    <option value={3}>Option D</option>
+                                  </select>
+                                </div>
+                              </div>
+                            ))}
+                            {fcQuestions.length === 0 && (
+                              <p className="text-xs text-slate-400 bg-slate-50/50 dark:bg-emerald-950/20 p-4 rounded-xl text-center">
+                                No custom CBT questions defined. The course will fall back to default questions.
+                              </p>
+                            )}
                           </div>
                         </div>
 

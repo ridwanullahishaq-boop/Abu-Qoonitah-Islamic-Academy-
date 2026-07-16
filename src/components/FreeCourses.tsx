@@ -13,11 +13,70 @@ interface FreeCourseData {
   poemArabicText: string[];
   poemTranslationText: string[];
   audioFiles: { id: string; title: string; url: string; description: string; }[];
+  examQuestions?: { id: number; question: string; options: string[]; correctIndex: number; }[];
 }
 
 interface FreeCoursesProps {
   isArabic: boolean;
 }
+
+const DEFAULT_FC_QUESTIONS = [
+  {
+    id: 1,
+    question: "Who is the noble author of the classical Al-Laamiyyah poem?",
+    options: [
+      "Shaykh al-Islam Ibn Taimiyyah",
+      "Imam Al-Ghazali",
+      "Ibn Al-Qayyim",
+      "Imam Al-Shafi'i"
+    ],
+    correctIndex: 0
+  },
+  {
+    id: 2,
+    question: "What primary Islamic discipline is Al-Laamiyyah centered on?",
+    options: [
+      "Arabic Rhetoric and Grammar",
+      "Aqeedah (Islamic Creed) & Student Manners",
+      "Fiqh of Inheritance",
+      "Detailed Seerah of the Prophet"
+    ],
+    correctIndex: 1
+  },
+  {
+    id: 3,
+    question: "How many verses are contained in the classical Laamiyyatu Ibn Taimiyyah poem?",
+    options: [
+      "100 verses",
+      "50 verses",
+      "16 verses",
+      "30 verses"
+    ],
+    correctIndex: 2
+  },
+  {
+    id: 4,
+    question: "What does the linguistic title 'Laamiyyah' signify?",
+    options: [
+      "It was written in the holy month of Ramadan",
+      "Every single verse terminates with the Arabic letter Lam (ل)",
+      "It was dedicated to his student named Lam",
+      "It was penned in the ancient town of Laam"
+    ],
+    correctIndex: 1
+  },
+  {
+    id: 5,
+    question: "What is the correct Islamic creed regarding the noble Companions of the Prophet as outlined in the poem?",
+    options: [
+      "Complete love, respect, asking Allah to be pleased with them, and silent defense",
+      "Excessive praise raising them above prophets",
+      "Complete disregard of their ranks",
+      "Categorical rejection of their historic narratives"
+    ],
+    correctIndex: 0
+  }
+];
 
 export default function FreeCourses({ isArabic }: FreeCoursesProps) {
   const [data, setData] = useState<FreeCourseData | null>(null);
@@ -39,63 +98,16 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
   const [examScore, setExamScore] = useState<number | null>(null);
   const [examFeedback, setExamFeedback] = useState("");
 
-  const examQuestions = [
-    {
-      id: 1,
-      question: "Who is the noble author of the classical Al-Laamiyyah poem?",
-      options: [
-        "Shaykh al-Islam Ibn Taimiyyah",
-        "Imam Al-Ghazali",
-        "Ibn Al-Qayyim",
-        "Imam Al-Shafi'i"
-      ],
-      correctIndex: 0
-    },
-    {
-      id: 2,
-      question: "What primary Islamic discipline is Al-Laamiyyah centered on?",
-      options: [
-        "Arabic Rhetoric and Grammar",
-        "Aqeedah (Islamic Creed) & Student Manners",
-        "Fiqh of Inheritance",
-        "Detailed Seerah of the Prophet"
-      ],
-      correctIndex: 1
-    },
-    {
-      id: 3,
-      question: "How many verses are contained in the classical Laamiyyatu Ibn Taimiyyah poem?",
-      options: [
-        "100 verses",
-        "50 verses",
-        "16 verses",
-        "30 verses"
-      ],
-      correctIndex: 2
-    },
-    {
-      id: 4,
-      question: "What does the linguistic title 'Laamiyyah' signify?",
-      options: [
-        "It was written in the holy month of Ramadan",
-        "Every single verse terminates with the Arabic letter Lam (ل)",
-        "It was dedicated to his student named Lam",
-        "It was penned in the ancient town of Laam"
-      ],
-      correctIndex: 1
-    },
-    {
-      id: 5,
-      question: "What is the correct Islamic creed regarding the noble Companions of the Prophet as outlined in the poem?",
-      options: [
-        "Complete love, respect, asking Allah to be pleased with them, and silent defense",
-        "Excessive praise raising them above prophets",
-        "Complete disregard of their ranks",
-        "Categorical rejection of their historic narratives"
-      ],
-      correctIndex: 0
-    }
-  ];
+  const studentSessionRef = React.useRef(studentSession);
+  useEffect(() => {
+    studentSessionRef.current = studentSession;
+  }, [studentSession]);
+
+  const activeQuestions = data?.examQuestions && data.examQuestions.length > 0
+    ? data.examQuestions
+    : DEFAULT_FC_QUESTIONS;
+
+  const passingRequirementScore = Math.ceil(activeQuestions.length * 0.8);
 
   // Load course details and check for local session
   useEffect(() => {
@@ -130,6 +142,52 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
     };
   }, []);
 
+  const toggleTrackCompletionDirect = (fileId: string, session: any) => {
+    if (!session) return;
+    let updatedCompleted = [...(session.completedAudios || [])];
+    if (updatedCompleted.includes(fileId)) {
+      return; // Already completed, don't toggle off automatically
+    }
+    updatedCompleted.push(fileId);
+
+    const totalTracks = data?.audioFiles?.length || 1;
+    const progressPercent = Math.min(100, Math.round((updatedCompleted.length / totalTracks) * 100));
+    
+    const updatedSession = {
+      ...session,
+      completedAudios: updatedCompleted,
+      progress: progressPercent
+    };
+
+    setStudentSession(updatedSession);
+    localStorage.setItem("fc_student_session", JSON.stringify(updatedSession));
+
+    // Sync to database
+    fetch("/api/public/free-course/progress", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        id: session.id,
+        completedAudios: updatedCompleted
+      })
+    })
+      .then((res) => res.json())
+      .then((resData) => {
+        if (resData.success && resData.student) {
+          const synced = {
+            ...updatedSession,
+            progress: resData.student.progress,
+            completedAudios: resData.student.completedAudios
+          };
+          setStudentSession(synced);
+          localStorage.setItem("fc_student_session", JSON.stringify(synced));
+        }
+      })
+      .catch(err => console.error("Error syncing progress:", err));
+  };
+
   const handlePlayPause = (fileId: string, url: string) => {
     if (playingId === fileId) {
       if (currentAudio) {
@@ -145,7 +203,13 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
         .then(() => {
           setCurrentAudio(audio);
           setPlayingId(fileId);
-          audio.onended = () => setPlayingId(null);
+          audio.onended = () => {
+            setPlayingId(null);
+            const currentSession = studentSessionRef.current;
+            if (currentSession && !currentSession.completedAudios?.includes(fileId)) {
+              toggleTrackCompletionDirect(fileId, currentSession);
+            }
+          };
         })
         .catch((err) => {
           alert("Unable to stream this audio file. Please check your internet connection.");
@@ -257,13 +321,13 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
   // Submit CBT Exam
   const handleSubmitExam = (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.keys(examAnswers).length < examQuestions.length) {
+    if (Object.keys(examAnswers).length < activeQuestions.length) {
       alert("Please answer all questions before submitting.");
       return;
     }
 
     let score = 0;
-    examQuestions.forEach((q, index) => {
+    activeQuestions.forEach((q, index) => {
       if (examAnswers[index] === q.correctIndex) {
         score++;
       }
@@ -272,8 +336,8 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
     setExamScore(score);
     setExamSubmitted(true);
 
-    if (score >= 4) {
-      setExamFeedback("🎉 MABRUK! You passed the CBT Exam! You scored " + score + "/5. You are now fully certified to receive your Certificate of Completion!");
+    if (score >= passingRequirementScore) {
+      setExamFeedback("🎉 MABRUK! You passed the CBT Exam! You scored " + score + "/" + activeQuestions.length + ". You are now fully certified to receive your Certificate of Completion!");
       
       // Update session locally
       const updatedSession = {
@@ -310,7 +374,7 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
         })
         .catch(err => console.error("Error syncing exam completion:", err));
     } else {
-      setExamFeedback("❌ Try Again! You scored " + score + "/5. You need at least 4/5 correct answers to pass and receive your certificate. Revise the classical verses or audio files and try again!");
+      setExamFeedback("❌ Try Again! You scored " + score + "/" + activeQuestions.length + ". You need at least " + passingRequirementScore + "/" + activeQuestions.length + " correct answers to pass and receive your certificate. Revise the classical verses or audio files and try again!");
     }
   };
 
@@ -665,18 +729,18 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
           </div>
 
           <div className="text-[11px] text-slate-500 leading-relaxed bg-amber-500/5 p-3.5 rounded-xl border border-amber-500/10">
-            <strong>Passing requirement:</strong> Answer at least 4 out of 5 questions correctly. Once you submit and pass, your graduation status is instant-synced to our records and your certificate will unlock!
+            <strong>Passing requirement:</strong> Answer at least {passingRequirementScore} out of {activeQuestions.length} questions correctly. Once you submit and pass, your graduation status is instant-synced to our records and your certificate will unlock!
           </div>
 
           {examFeedback && (
-            <div className={`p-4 rounded-xl text-[11px] font-bold ${examScore !== null && examScore >= 4 ? "bg-emerald-50 text-emerald-850 border border-emerald-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+            <div className={`p-4 rounded-xl text-[11px] font-bold ${examScore !== null && examScore >= passingRequirementScore ? "bg-emerald-50 text-emerald-850 border border-emerald-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
               {examFeedback}
             </div>
           )}
 
           <form onSubmit={handleSubmitExam} className="space-y-6">
-            {examQuestions.map((q, qIdx) => (
-              <div key={q.id} className="space-y-2 text-left">
+            {activeQuestions.map((q, qIdx) => (
+              <div key={q.id || qIdx} className="space-y-2 text-left">
                 <p className="font-bold text-slate-800 dark:text-white flex gap-1">
                   <span>{qIdx + 1}.</span>
                   <span>{q.question}</span>
@@ -694,11 +758,11 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
                         }`}
                       >
                         <input
-                          type="radio"
-                          name={`q-${q.id}`}
-                          checked={isSelected}
-                          disabled={examSubmitted && examScore !== null && examScore >= 4}
-                          onChange={() => {
+                           type="radio"
+                           name={`q-${q.id || qIdx}`}
+                           checked={isSelected}
+                           disabled={examSubmitted && examScore !== null && examScore >= passingRequirementScore}
+                           onChange={() => {
                             setExamAnswers({
                               ...examAnswers,
                               [qIdx]: optIdx
@@ -773,45 +837,49 @@ export default function FreeCourses({ isArabic }: FreeCoursesProps) {
                         : "bg-emerald-50/10 dark:bg-emerald-950/5 border-emerald-50/45 dark:border-emerald-900/20"
                     }`}
                   >
-                    <div className="space-y-1 min-w-0">
+                    <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        {studentSession && (
-                          <button
-                            type="button"
-                            onClick={() => toggleTrackCompletion(file.id)}
-                            className={`p-1 rounded cursor-pointer transition-colors ${
-                              isCompleted 
-                                ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-950" 
-                                : "text-slate-350 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-emerald-950/30"
-                            }`}
-                            title={isCompleted ? "Mark as uncompleted" : "Mark as completed"}
-                          >
-                            <Check className={`w-4 h-4 ${isCompleted ? "stroke-[3px]" : "stroke-[1.5px]"}`} />
-                          </button>
-                        )}
                         <h4 className="font-bold text-xs text-natural-green dark:text-amber-150 truncate">
                           {file.title}
                         </h4>
                       </div>
-                      <p className="text-[10px] text-slate-400 dark:text-slate-350 leading-relaxed line-clamp-2 pl-7">
+                      <p className="text-[10px] text-slate-400 dark:text-slate-350 leading-relaxed line-clamp-2">
                         {file.description}
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => handlePlayPause(file.id, file.url)}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-xs cursor-pointer transition-all ${
-                        playingId === file.id
-                          ? "bg-natural-gold text-white scale-105"
-                          : "bg-natural-green hover:bg-emerald-800 text-white"
-                      }`}
-                    >
+                    <div className="flex items-center gap-2 shrink-0">
+                      {studentSession && (
+                        <button
+                          type="button"
+                          onClick={() => toggleTrackCompletion(file.id)}
+                          className={`px-2 py-1.5 rounded-full border text-[9px] font-bold cursor-pointer transition-colors flex items-center gap-1 ${
+                            isCompleted 
+                              ? "bg-emerald-50 dark:bg-emerald-950 text-emerald-700 border-emerald-300" 
+                              : "bg-white dark:bg-emerald-900/10 text-slate-400 border-slate-200 hover:text-emerald-700 hover:border-emerald-500"
+                          }`}
+                          title={isCompleted ? "Mark as uncompleted" : "Mark as completed"}
+                        >
+                          <Check className="w-3 h-3 stroke-[3px]" />
+                          <span>{isCompleted ? "Completed" : "Mark Done"}</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handlePlayPause(file.id, file.url)}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-xs cursor-pointer transition-all ${
+                          playingId === file.id
+                            ? "bg-natural-gold text-white scale-105"
+                            : "bg-natural-green hover:bg-emerald-800 text-white"
+                        }`}
+                      >
                       {playingId === file.id ? (
                         <Pause className="w-4 h-4 text-white fill-white" />
                       ) : (
                         <Play className="w-4 h-4 text-white fill-white ml-0.5" />
                       )}
                     </button>
+                    </div>
                   </div>
                 );
               })}

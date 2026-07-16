@@ -116,7 +116,7 @@ interface DatabaseSchema {
     values: { titleEn: string; titleAr: string; descEn: string; descAr: string; }[];
     faqs: { qEn: string; qAr: string; aEn: string; aAr: string; }[];
   };
-  sermons: { id: string; title: string; category: string; duration: string; url: string; speaker: string; }[];
+  sermons: { id: string; title: string; category: string; duration: string; url: string; speaker: string; coverUrl?: string; isAudio?: boolean; }[];
   curriculum: {
     whyEnroll: string;
     sections: {
