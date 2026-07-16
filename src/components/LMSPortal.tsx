@@ -768,16 +768,18 @@ Please verify my payment receipt and activate my admission. Jazakum Allahu Khair
     }
   };
 
-  const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setIsReceiptUploading(true);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setRegReceiptUrl(reader.result as string);
+      try {
+        const compressed = await compressImage(file);
+        setRegReceiptUrl(compressed);
+      } catch (err) {
+        console.error("Error loading receipt:", err);
+      } finally {
         setIsReceiptUploading(false);
-      };
-      reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -785,17 +787,19 @@ Please verify my payment receipt and activate my admission. Jazakum Allahu Khair
     e.preventDefault();
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) {
       setIsReceiptUploading(true);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setRegReceiptUrl(reader.result as string);
+      try {
+        const compressed = await compressImage(file);
+        setRegReceiptUrl(compressed);
+      } catch (err) {
+        console.error("Error loading receipt:", err);
+      } finally {
         setIsReceiptUploading(false);
-      };
-      reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -1585,19 +1589,79 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
       });
   };
 
-  const handleFcCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Helper function to compress images before converting to Base64 to prevent storage and network payload errors
+  function compressImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> {
+    return new Promise((resolve) => {
+      // If it's not an image, resolve with standard FileReader
+      if (!file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(event.target?.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => {
+          resolve(event.target?.result as string);
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const handleFcCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFcImageUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setFcImageUrl(compressed);
+    } catch (err) {
+      console.error("Error compressing cover:", err);
+    }
   };
 
   const handleFcAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Warn if audio file is extremely large
+    if (file.size > 15 * 1024 * 1024) {
+      alert("⚠️ Warning: This audio file is very large (" + Math.round(file.size / 1024 / 1024) + "MB). For optimal streaming performance, we highly recommend uploading files under 10MB, or using an external stream URL.");
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
       const updated = [...fcAudioFiles];
@@ -1607,19 +1671,29 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     reader.readAsDataURL(file);
   };
 
-  const handleSermonCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSermonCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNewSermonCoverUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file);
+      setNewSermonCoverUrl(compressed);
+    } catch (err) {
+      console.error("Error compressing sermon cover:", err);
+    }
   };
 
   const handleSermonMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Check file size for sermon media
+    if (file.size > 20 * 1024 * 1024) {
+      alert("❌ File Too Large: This video/audio file is " + Math.round(file.size / 1024 / 1024) + "MB. The server has a strict upload payload limit to prevent database synchronization timeouts. Please paste an external URL (e.g. YouTube Embed, SoundCloud, Google Drive) or compress your media file to under 15MB first.");
+      return;
+    } else if (file.size > 8 * 1024 * 1024) {
+      alert("⚠️ Warning: This media file is " + Math.round(file.size / 1024 / 1024) + "MB. It may take some time to upload and synchronize with Supabase Cloud. For the best experience, we recommend using external YouTube embeds or audio links.");
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
       setNewSermonUrl(reader.result as string);
@@ -1630,6 +1704,11 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
   const handleBookPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert("⚠️ Warning: This PDF is quite large (" + Math.round(file.size / 1024 / 1024) + "MB). It might cause upload issues. Consider using an external download link for larger documents.");
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
       setNewBookDownloadUrl(reader.result as string);
