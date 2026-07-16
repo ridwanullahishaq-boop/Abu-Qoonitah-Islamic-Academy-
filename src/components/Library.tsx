@@ -91,11 +91,21 @@ export default function Library({ isArabic, activeSection: initialSection }: Lib
     );
   });
 
-  const triggerDownloadSimulation = (bookTitle: string) => {
-    alert(isArabic 
-      ? `بدء تحميل كتاب "${bookTitle}" بصيغة PDF. جاري تواصلك بخادم التوزيع الأكاديمي...` 
-      : `Starting PDF download for "${bookTitle}". Connecting to Madrasah library servers...`
-    );
+  const triggerDownloadSimulation = (book: any) => {
+    if (book.downloadUrl && book.downloadUrl !== "#") {
+      const link = document.createElement("a");
+      link.href = book.downloadUrl;
+      link.download = `${book.title.replace(/[\s\W]+/g, "_")}.pdf`;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert(isArabic 
+        ? `بدء تحميل كتاب "${book.title}" بصيغة PDF. جاري تواصلك بخادم التوزيع الأكاديمي...` 
+        : `Starting PDF download for "${book.title}". Connecting to Madrasah library servers...`
+      );
+    }
   };
 
   return (
@@ -222,7 +232,7 @@ export default function Library({ isArabic, activeSection: initialSection }: Lib
                   </div>
 
                   <button
-                    onClick={() => triggerDownloadSimulation(book.title)}
+                    onClick={() => triggerDownloadSimulation(book)}
                     className="w-full py-2 bg-natural-sage/20 hover:bg-natural-sage/40 dark:bg-natural-green/45 dark:hover:bg-natural-green text-natural-green dark:text-natural-gold text-xs font-bold rounded-full flex items-center justify-center gap-1.5 transition-all border-none"
                   >
                     <Download className="w-3.5 h-3.5" />

@@ -466,7 +466,47 @@ const initialDB: DatabaseSchema = {
     { id: "serm-2", title: "A Journey Through the Biography of Imam Nawawi", category: "Hadith", duration: "55:30", url: "https://www.youtube.com/embed/8I869l_5mYg", speaker: "Shaykh Ahmed Al-Misri" },
     { id: "serm-3", title: "The Virtues of Ramadan & Laylatul Qadr", category: "Ramadan", duration: "38:45", url: "https://www.youtube.com/embed/jZ_E3O9nK8A", speaker: "Ustadh Abu Qoonitah" },
     { id: "serm-4", title: "Friday Khutbah: Keeping the Tongue Moist with Dhikr", category: "Khutbah", duration: "25:12", url: "https://www.youtube.com/embed/vT4r_2bI-0Q", speaker: "Shaykh Ahmed Al-Misri" },
-    { id: "serm-5", title: "Explaining Surah Al-Kahf Tafsir", category: "Tafsir", duration: "1:15:20", url: "https://www.youtube.com/embed/8I869l_5mYg", speaker: "Shaykh Ahmed Al-Misri" }
+    { id: "serm-5", title: "Explaining Surah Al-Kahf Tafsir", category: "Tafsir", duration: "1:15:20", url: "https://www.youtube.com/embed/8I869l_5mYg", speaker: "Shaykh Ahmed Al-Misri" },
+    {
+      id: "serm-quran-minshawi-fatiha",
+      title: "Surah Al-Fatiha (The Opening) Recitation",
+      category: "Quran Recitation",
+      duration: "02:15",
+      url: "https://server11.mp3quran.net/minsh/001.mp3",
+      speaker: "Qari Muhammad Siddiq Al-Minshawi",
+      coverUrl: "https://images.unsplash.com/photo-1609599006353-e629f1d40e4a?w=400",
+      isAudio: true
+    },
+    {
+      id: "serm-quran-minshawi-ikhlas",
+      title: "Surah Al-Ikhlas (The Sincerity) Recitation",
+      category: "Quran Recitation",
+      duration: "00:45",
+      url: "https://server11.mp3quran.net/minsh/112.mp3",
+      speaker: "Qari Muhammad Siddiq Al-Minshawi",
+      coverUrl: "https://images.unsplash.com/photo-1609599006353-e629f1d40e4a?w=400",
+      isAudio: true
+    },
+    {
+      id: "serm-quran-husary-fatiha",
+      title: "Surah Al-Fatiha (The Opening) Recitation",
+      category: "Quran Recitation",
+      duration: "02:30",
+      url: "https://server13.mp3quran.net/husr/001.mp3",
+      speaker: "Qari Mahmoud Khalil Al-Husary",
+      coverUrl: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400",
+      isAudio: true
+    },
+    {
+      id: "serm-quran-husary-maun",
+      title: "Surah Al-Ma'un (The Small Kindnesses) Recitation",
+      category: "Quran Recitation",
+      duration: "01:10",
+      url: "https://server13.mp3quran.net/husr/107.mp3",
+      speaker: "Qari Mahmoud Khalil Al-Husary",
+      coverUrl: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400",
+      isAudio: true
+    }
   ],
   curriculum: {
     whyEnroll: "Abu Qoonitah Islamic Academy provides a structured online Madrasah environment that blends the depth of classical, traditional texts with the speed and reach of modern LMS technology. Gain a firm foundation in Tajweed, Arabic grammar, and authentic Islamic creed under certified teachers with direct supervision.",
@@ -730,6 +770,116 @@ app.post("/api/admin/free-course", authenticate, (req, res) => {
   res.json({ success: true, freeCourse: db.freeCourse });
 });
 
+// GET /api/admin/free-course/enrollments
+app.get("/api/admin/free-course/enrollments", authenticate, (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ error: "Access denied. Admins only." });
+    return;
+  }
+  const enrollments = (db as any).freeCourseEnrollments || [];
+  res.json(enrollments);
+});
+
+// DELETE /api/admin/free-course/enrollments/:id
+app.delete("/api/admin/free-course/enrollments/:id", authenticate, (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ error: "Access denied. Admins only." });
+    return;
+  }
+  const targetId = req.params.id;
+  const enrollments = (db as any).freeCourseEnrollments || [];
+  const filtered = enrollments.filter((e: any) => e.id !== targetId);
+  (db as any).freeCourseEnrollments = filtered;
+  saveDatabase();
+  res.json({ success: true, message: "Free course enrollment deleted." });
+});
+
+// POST /api/public/free-course/register
+app.post("/api/public/free-course/register", (req, res) => {
+  const { name, whatsapp } = req.body;
+  if (!name || !whatsapp) {
+    res.status(400).json({ error: "Name and WhatsApp number are required." });
+    return;
+  }
+
+  if (!(db as any).freeCourseEnrollments) {
+    (db as any).freeCourseEnrollments = [];
+  }
+
+  // Check if already registered
+  let student = (db as any).freeCourseEnrollments.find((e: any) => e.whatsapp === whatsapp);
+  if (!student) {
+    student = {
+      id: "fc-" + Math.random().toString(36).substr(2, 9),
+      name,
+      whatsapp,
+      progress: 0,
+      completedAudios: [],
+      examScore: null,
+      completed: false,
+      joinedAt: new Date().toISOString()
+    };
+    (db as any).freeCourseEnrollments.push(student);
+    saveDatabase();
+  }
+
+  res.json({ success: true, student });
+});
+
+// POST /api/public/free-course/progress
+app.post("/api/public/free-course/progress", (req, res) => {
+  const { id, completedAudios } = req.body;
+  if (!id) {
+    res.status(400).json({ error: "Student ID is required." });
+    return;
+  }
+
+  const enrollments = (db as any).freeCourseEnrollments || [];
+  const student = enrollments.find((e: any) => e.id === id);
+  if (!student) {
+    res.status(404).json({ error: "Student registration not found." });
+    return;
+  }
+
+  student.completedAudios = completedAudios || [];
+  
+  // Calculate progress percentage
+  const totalAudios = db.freeCourse && db.freeCourse.audioFiles ? db.freeCourse.audioFiles.length : 1;
+  student.progress = Math.min(100, Math.round((student.completedAudios.length / (totalAudios || 1)) * 100));
+  
+  saveDatabase();
+  res.json({ success: true, student });
+});
+
+// POST /api/public/free-course/submit-exam
+app.post("/api/public/free-course/submit-exam", (req, res) => {
+  const { id, score } = req.body;
+  if (!id) {
+    res.status(400).json({ error: "Student ID is required." });
+    return;
+  }
+
+  const enrollments = (db as any).freeCourseEnrollments || [];
+  const student = enrollments.find((e: any) => e.id === id);
+  if (!student) {
+    res.status(404).json({ error: "Student registration not found." });
+    return;
+  }
+
+  student.examScore = score;
+  if (score >= 4) { // 4 out of 5 is a pass
+    student.completed = true;
+    student.progress = 100;
+  }
+
+  saveDatabase();
+  res.json({ success: true, student });
+});
+
 // Admin: About Us & FAQ Settings
 app.post("/api/admin/about", authenticate, (req, res) => {
   const userId = (req as any).userId;
@@ -843,7 +993,7 @@ app.put("/api/admin/books/:id", authenticate, (req, res) => {
     res.status(403).json({ error: "Access denied." });
     return;
   }
-  const { title, author, category, description, coverUrl } = req.body;
+  const { title, author, category, description, coverUrl, downloadUrl } = req.body;
   const bookIndex = db.books.findIndex(b => b.id === req.params.id);
   if (bookIndex === -1) {
     res.status(404).json({ error: "Book not found." });
@@ -856,7 +1006,8 @@ app.put("/api/admin/books/:id", authenticate, (req, res) => {
     author,
     category,
     description,
-    coverUrl: coverUrl || db.books[bookIndex].coverUrl
+    coverUrl: coverUrl || db.books[bookIndex].coverUrl,
+    downloadUrl: downloadUrl || db.books[bookIndex].downloadUrl
   };
   
   saveDatabase();
@@ -1511,6 +1662,34 @@ app.get("/api/admin/admission-list", authenticate, (req, res) => {
   res.json(list);
 });
 
+// Admin: Delete student or teacher profile
+app.delete("/api/admin/profiles/:id", authenticate, (req, res) => {
+  const adminId = (req as any).userId;
+  const admin = db.users[adminId];
+  const targetId = req.params.id;
+
+  if (!admin || admin.role !== "admin") {
+    res.status(403).json({ error: "Access denied. Admins only." });
+    return;
+  }
+
+  const targetUser = db.users[targetId];
+  if (!targetUser) {
+    res.status(404).json({ error: "User not found." });
+    return;
+  }
+
+  if (targetId === adminId) {
+    res.status(400).json({ error: "You cannot delete your own admin account." });
+    return;
+  }
+
+  delete db.users[targetId];
+  saveDatabase();
+
+  res.json({ success: true, message: `Profile of ${targetUser.name} has been deleted.` });
+});
+
 // Admin: Lock/Unlock paid student
 app.post("/api/admin/students/:id/payment", authenticate, (req, res) => {
   const adminId = (req as any).userId;
@@ -1839,7 +2018,7 @@ app.delete("/api/admin/courses/:courseId/quizzes/:quizId", authenticate, (req, r
 app.post("/api/admin/books/add", authenticate, (req, res) => {
   const userId = (req as any).userId;
   const user = db.users[userId];
-  const { title, author, category, description, coverUrl } = req.body;
+  const { title, author, category, description, coverUrl, downloadUrl } = req.body;
 
   if (!user || user.role !== "admin") {
     res.status(403).json({ error: "Access denied." });
@@ -1852,7 +2031,7 @@ app.post("/api/admin/books/add", authenticate, (req, res) => {
     author,
     category,
     description,
-    downloadUrl: "#",
+    downloadUrl: downloadUrl || "#",
     coverUrl: coverUrl || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&auto=format&fit=crop&q=80"
   };
 

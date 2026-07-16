@@ -28,7 +28,7 @@ export default function SermonTV({ isArabic }: SermonTVProps) {
       .catch((err) => console.error("Error loading sermons:", err));
   }, []);
 
-  const categories = ["All", "Khutbah", "Ramadan", "Tafsir", "Hadith", "Fiqh", "Motivational talks"];
+  const categories = ["All", "Quran Recitation", "Khutbah", "Ramadan", "Tafsir", "Hadith", "Fiqh", "Motivational talks"];
 
   const filteredSermons = sermons.filter((sermon) => {
     const matchesCategory = selectedCategory === "All" || sermon.category === selectedCategory;
@@ -104,6 +104,15 @@ export default function SermonTV({ isArabic }: SermonTVProps) {
                       className="w-full max-w-xs sm:max-w-md h-9 mt-2 rounded-full focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
+                </div>
+              ) : activeSermon.url?.startsWith("data:video") || activeSermon.url?.endsWith(".mp4") || activeSermon.url?.endsWith(".webm") ? (
+                <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-black shadow-lg border border-emerald-50 dark:border-emerald-900/40 flex items-center justify-center">
+                  <video
+                    className="absolute inset-0 w-full h-full object-contain"
+                    src={activeSermon.url}
+                    controls
+                    autoPlay
+                  />
                 </div>
               ) : (
                 <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-black shadow-lg border border-emerald-50 dark:border-emerald-900/40">

@@ -794,6 +794,46 @@
       "duration": "1:15:20",
       "url": "https://www.youtube.com/embed/8I869l_5mYg",
       "speaker": "Shaykh Ahmed Al-Misri"
+    },
+    {
+      "id": "serm-quran-minshawi-fatiha",
+      "title": "Surah Al-Fatiha (The Opening) Recitation",
+      "category": "Quran Recitation",
+      "duration": "02:15",
+      "url": "https://server11.mp3quran.net/minsh/001.mp3",
+      "speaker": "Qari Muhammad Siddiq Al-Minshawi",
+      "coverUrl": "https://images.unsplash.com/photo-1609599006353-e629f1d40e4a?w=400",
+      "isAudio": true
+    },
+    {
+      "id": "serm-quran-minshawi-ikhlas",
+      "title": "Surah Al-Ikhlas (The Sincerity) Recitation",
+      "category": "Quran Recitation",
+      "duration": "00:45",
+      "url": "https://server11.mp3quran.net/minsh/112.mp3",
+      "speaker": "Qari Muhammad Siddiq Al-Minshawi",
+      "coverUrl": "https://images.unsplash.com/photo-1609599006353-e629f1d40e4a?w=400",
+      "isAudio": true
+    },
+    {
+      "id": "serm-quran-husary-fatiha",
+      "title": "Surah Al-Fatiha (The Opening) Recitation",
+      "category": "Quran Recitation",
+      "duration": "02:30",
+      "url": "https://server13.mp3quran.net/husr/001.mp3",
+      "speaker": "Qari Mahmoud Khalil Al-Husary",
+      "coverUrl": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400",
+      "isAudio": true
+    },
+    {
+      "id": "serm-quran-husary-maun",
+      "title": "Surah Al-Ma'un (The Small Kindnesses) Recitation",
+      "category": "Quran Recitation",
+      "duration": "01:10",
+      "url": "https://server13.mp3quran.net/husr/107.mp3",
+      "speaker": "Qari Mahmoud Khalil Al-Husary",
+      "coverUrl": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400",
+      "isAudio": true
     }
   ],
   "curriculum": {

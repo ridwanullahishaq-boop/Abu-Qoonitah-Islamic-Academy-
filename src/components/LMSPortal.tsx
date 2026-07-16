@@ -170,7 +170,8 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
 
   // Tuition Payment state overrides
   const [tuitionPayType, setTuitionPayType] = useState<'monthly' | 'semester'>('semester');
-  const [activeCertificate, setActiveCertificate] = useState<"beginner" | "intermediate" | null>(null);
+  const [activeCertificate, setActiveCertificate] = useState<"beginner" | "intermediate" | "free" | null>(null);
+  const [calendarSemester, setCalendarSemester] = useState<"semester1" | "semester2">("semester1");
 
   // Assignment upload states
   const [activeAssign, setActiveAssign] = useState<any | null>(null);
@@ -278,6 +279,8 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [fcAudioFiles, setFcAudioFiles] = useState<{ id: string; title: string; url: string; description: string }[]>([]);
   const [fcSaving, setFcSaving] = useState(false);
   const [fcMessage, setFcMessage] = useState("");
+  const [fcEnrollments, setFcEnrollments] = useState<any[]>([]);
+  const [fcEnrollmentsLoading, setFcEnrollmentsLoading] = useState(false);
 
   // Admin About Us & FAQ states
   const [aboutUsHistoryEn, setAboutUsHistoryEn] = useState("");
@@ -331,6 +334,7 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [newBookCategory, setNewBookCategory] = useState("Hadith");
   const [newBookDesc, setNewBookDesc] = useState("");
   const [newBookCoverUrl, setNewBookCoverUrl] = useState("");
+  const [newBookDownloadUrl, setNewBookDownloadUrl] = useState("");
   const [newPoemTitle, setNewPoemTitle] = useState("");
   const [newPoemPoet, setNewPoemPoet] = useState("");
   const [newPoemBio, setNewPoemBio] = useState("");
@@ -557,6 +561,23 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
           }
         })
         .catch((err) => console.error(err));
+
+      setFcEnrollmentsLoading(true);
+      const token = localStorage.getItem("token") || "";
+      fetch("/api/admin/free-course/enrollments", {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          setFcEnrollments(Array.isArray(data) ? data : []);
+          setFcEnrollmentsLoading(false);
+        })
+        .catch((err) => {
+          console.error(err);
+          setFcEnrollmentsLoading(false);
+        });
     }
   }, [currentUser, adminSubTab]);
 
@@ -1591,6 +1612,26 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     reader.readAsDataURL(file);
   };
 
+  const handleSermonMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewSermonUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBookPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewBookDownloadUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const startSermonRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1917,7 +1958,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
       author: newBookAuthor,
       category: newBookCategory,
       description: newBookDesc,
-      coverUrl: newBookCoverUrl
+      coverUrl: newBookCoverUrl,
+      downloadUrl: newBookDownloadUrl
     };
 
     if (editingBookId) {
@@ -1938,6 +1980,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
             setNewBookAuthor("");
             setNewBookDesc("");
             setNewBookCoverUrl("");
+            setNewBookDownloadUrl("");
             setEditingBookId(null);
             setLibMessage("📚 Book updated successfully!");
             setTimeout(() => setLibMessage(""), 4500);
@@ -1968,6 +2011,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
             setNewBookAuthor("");
             setNewBookDesc("");
             setNewBookCoverUrl("");
+            setNewBookDownloadUrl("");
             setLibMessage("📚 Book added to library successfully!");
             setTimeout(() => setLibMessage(""), 4500);
           } else {
@@ -1989,6 +2033,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     setNewBookCategory(book.category || "Hadith");
     setNewBookDesc(book.description || "");
     setNewBookCoverUrl(book.coverUrl || "");
+    setNewBookDownloadUrl(book.downloadUrl || "");
     const element = document.getElementById("admin-book-form");
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
@@ -2001,6 +2046,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     setNewBookAuthor("");
     setNewBookDesc("");
     setNewBookCoverUrl("");
+    setNewBookDownloadUrl("");
   };
 
   const handleDeleteLibraryBook = (id: string) => {
@@ -2164,6 +2210,58 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
       .catch((err) => {
         setAdmissionError(err.message);
         setAdmissionLoading(false);
+      });
+  };
+
+  const handleDeleteProfile = (id: string, name: string, role: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the ${role} profile of "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+    const token = localStorage.getItem("token") || "";
+    fetch(`/api/admin/profiles/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          alert(`Success: ${data.message || "Profile deleted."}`);
+          fetchAdmissionList();
+        } else {
+          alert(`Error: ${data.error || "Failed to delete profile."}`);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Failed to delete profile due to a network error.");
+      });
+  };
+
+  const handleDeleteFcEnrollment = (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the free course learning record of "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+    const token = localStorage.getItem("token") || "";
+    fetch(`/api/admin/free-course/enrollments/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          alert("Learning record deleted successfully.");
+          setFcEnrollments(prev => prev.filter(e => e.id !== id));
+        } else {
+          alert(`Error: ${data.error || "Failed to delete record."}`);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Failed to delete record due to a network error.");
       });
   };
 
@@ -2877,7 +2975,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     <th className="p-3.5">Email Address</th>
                     <th className="p-3.5">Username</th>
                     <th className="p-3.5">Password</th>
-                    <th className="p-3.5 pr-4 text-right">Quick Copy</th>
+                    <th className="p-3.5 pr-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-emerald-50/15">
@@ -2947,24 +3045,37 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             </div>
                           </td>
                           <td className="p-3.5 pr-4 text-right" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(item)}
-                              className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer inline-flex items-center gap-1 ${
-                                copiedId === item.id
-                                  ? "bg-emerald-600 text-white"
-                                  : "bg-slate-100 dark:bg-emerald-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200"
-                              }`}
-                            >
-                              {copiedId === item.id ? (
-                                <>
-                                  <Check className="w-3 h-3" />
-                                  <span>Copied!</span>
-                                </>
-                              ) : (
-                                <span>Copy Credentials</span>
+                            <div className="flex justify-end items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(item)}
+                                className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all cursor-pointer inline-flex items-center gap-1 ${
+                                  copiedId === item.id
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-100 dark:bg-emerald-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200"
+                                }`}
+                              >
+                                {copiedId === item.id ? (
+                                  <>
+                                    <Check className="w-3 h-3" />
+                                    <span>Copied!</span>
+                                  </>
+                                ) : (
+                                  <span>Copy</span>
+                                )}
+                              </button>
+                              {currentUser?.role === "admin" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProfile(item.id, item.name, item.role)}
+                                  className="px-2 py-1 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 text-red-600 dark:text-red-400 font-bold text-[10px] rounded transition-all cursor-pointer inline-flex items-center gap-1"
+                                  title="Delete Profile"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Delete</span>
+                                </button>
                               )}
-                            </button>
+                            </div>
                           </td>
                         </tr>
 
@@ -3186,6 +3297,32 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
           {/* TAB 1: CALENDAR VIEW */}
           {activeTab === "calendar" && (
             <div className="space-y-6">
+              {/* Semester Selector Switcher */}
+              <div className="flex justify-center items-center gap-3 bg-white dark:bg-emerald-950 p-2.5 rounded-2xl max-w-sm mx-auto border border-emerald-100 dark:border-emerald-900 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setCalendarSemester("semester1")}
+                  className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    calendarSemester === "semester1"
+                      ? "bg-emerald-700 text-white shadow-md scale-[1.02]"
+                      : "text-slate-600 dark:text-emerald-200 hover:text-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/40"
+                  }`}
+                >
+                  Semester 1 (3 Months)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarSemester("semester2")}
+                  className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    calendarSemester === "semester2"
+                      ? "bg-emerald-700 text-white shadow-md scale-[1.02]"
+                      : "text-slate-600 dark:text-emerald-200 hover:text-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/40"
+                  }`}
+                >
+                  Semester 2 (3 Months)
+                </button>
+              </div>
+
               {/* Official Beautiful Master Syllabus & Guidelines */}
               <div className="bg-amber-500/5 dark:bg-emerald-950/25 border-2 border-dashed border-amber-500/20 rounded-3xl p-6 sm:p-8 space-y-6 animate-fade-in">
                 <div className="text-center space-y-1">
@@ -3194,7 +3331,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     Abu Qoonitah University of Deen
                   </h2>
                   <p className="text-sm font-serif italic text-slate-500 dark:text-emerald-300">
-                    Official School Calendar — Semester 1 (3 Months)
+                    Official School Calendar — {calendarSemester === "semester1" ? "Semester 1" : "Semester 2"} (3 Months)
                   </p>
                 </div>
 
@@ -3202,7 +3339,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                 <div className="bg-white dark:bg-emerald-900 border border-emerald-100 dark:border-emerald-800 rounded-2xl p-5 shadow-xs space-y-4">
                   <h3 className="font-serif font-bold text-sm text-natural-green dark:text-amber-100 flex items-center gap-1.5 border-b border-emerald-50 dark:border-emerald-800 pb-2">
                     <Award className="w-4 h-4 text-amber-500" />
-                    <span>Academic Marking System & Guidelines</span>
+                    <span>Academic Marking System & Guidelines ({calendarSemester === "semester1" ? "First Semester" : "Second Semester"})</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-2">
@@ -3214,7 +3351,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       <div className="flex items-start gap-2">
                         <span className="w-2 h-2 rounded-full bg-amber-500 mt-1.5"></span>
                         <p className="text-slate-600 dark:text-emerald-300 leading-relaxed">
-                          <span className="font-bold">Assignments Weight:</span> Carries <span className="font-bold">20 Marks</span> in total. When you submit any assignment, you will instantly get <span className="font-bold text-amber-600">one mark (1 Mark)</span> recorded on that submission!
+                          <span className="font-bold">Assignments Weight:</span> Carries <span className="font-bold">20 Marks</span> in total. When you submit your homework assignment, you will get <span className="font-bold text-amber-600">one mark (1 Mark)</span> on each assignment recorded!
                         </p>
                       </div>
                     </div>
@@ -3223,7 +3360,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       <div className="text-[10px] font-bold font-mono uppercase text-amber-600">Semester Marks Breakdown</div>
                       <ul className="space-y-1 text-[11px] font-sans text-slate-600 dark:text-emerald-300">
                         <li className="flex justify-between border-b border-emerald-500/10 pb-1">
-                          <span>📝 submitted Homework Assignments</span>
+                          <span>📝 Submitted Homework Assignments</span>
                           <span className="font-bold font-mono text-natural-green dark:text-amber-300">20 Marks</span>
                         </li>
                         <li className="flex justify-between border-b border-emerald-500/10 py-1">
@@ -3247,32 +3384,40 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                 <div className="space-y-3">
                   <h3 className="font-serif font-bold text-sm text-natural-green dark:text-amber-100 flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-amber-500" />
-                    <span>Weekly Study Schedule & Milestones</span>
+                    <span>Weekly Study Schedule & Milestones ({calendarSemester === "semester1" ? "Semester 1" : "Semester 2"})</span>
                   </h3>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs font-sans">
                     <div className="bg-white dark:bg-emerald-900 border border-emerald-100 dark:border-emerald-800 p-4 rounded-xl space-y-1">
                       <div className="text-[10px] font-mono font-bold text-amber-600 uppercase">Week 1 - 2</div>
                       <div className="font-serif font-bold text-natural-green dark:text-white">Basics & Foundation</div>
-                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">Watch Video 1, 2, 3 & 4 + Submit Assignments</p>
+                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">
+                        Watch Video {calendarSemester === "semester1" ? "1, 2, 3 & 4" : "21, 22, 23 & 24"} + Submit Assignments
+                      </p>
                     </div>
 
                     <div className="bg-white dark:bg-emerald-900 border border-emerald-100 dark:border-emerald-800 p-4 rounded-xl space-y-1">
                       <div className="text-[10px] font-mono font-bold text-amber-600 uppercase">Week 3 - 4</div>
                       <div className="font-serif font-bold text-natural-green dark:text-white">Syntax & Vocabulary</div>
-                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">Watch Video 5, 6, 7 & 8 + Submit Assignments</p>
+                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">
+                        Watch Video {calendarSemester === "semester1" ? "5, 6, 7 & 8" : "25, 26, 27 & 28"} + Submit Assignments
+                      </p>
                     </div>
 
                     <div className="bg-white dark:bg-emerald-900 border border-emerald-100 dark:border-emerald-800 p-4 rounded-xl space-y-1">
                       <div className="text-[10px] font-mono font-bold text-amber-600 uppercase">Week 5 - 6</div>
                       <div className="font-serif font-bold text-natural-green dark:text-white">Grammar Rules</div>
-                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">Watch Video 9, 10, 11 & 12 + Submit Assignments</p>
+                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">
+                        Watch Video {calendarSemester === "semester1" ? "9, 10, 11 & 12" : "29, 30, 31 & 32"} + Submit Assignments
+                      </p>
                     </div>
 
                     <div className="bg-white dark:bg-emerald-900 border border-emerald-100 dark:border-emerald-800 p-4 rounded-xl space-y-1">
                       <div className="text-[10px] font-mono font-bold text-amber-600 uppercase">Week 7 - 8</div>
                       <div className="font-serif font-bold text-natural-green dark:text-white">Matn Articulation</div>
-                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">Watch Video 13, 14, 15 & 16 + Submit Assignments</p>
+                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">
+                        Watch Video {calendarSemester === "semester1" ? "13, 14, 15 & 16" : "33, 34, 35 & 36"} + Submit Assignments
+                      </p>
                     </div>
 
                     <div className="bg-amber-500/10 border-2 border-amber-500/20 p-4 rounded-xl space-y-1">
@@ -3287,7 +3432,9 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     <div className="bg-white dark:bg-emerald-900 border border-emerald-100 dark:border-emerald-800 p-4 rounded-xl space-y-1">
                       <div className="text-[10px] font-mono font-bold text-amber-600 uppercase">Week 9 - 10</div>
                       <div className="font-serif font-bold text-natural-green dark:text-white">Sentence Synthesis</div>
-                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">Watch Video 17, 18, 19 & 20 + Submit Assignments</p>
+                      <p className="text-slate-500 dark:text-emerald-300 text-[11px]">
+                        Watch Video {calendarSemester === "semester1" ? "17, 18, 19 & 20" : "37, 38, 39 & 40"} + Submit Assignments
+                      </p>
                     </div>
 
                     <div className="bg-amber-500/10 border-2 border-amber-500/20 p-4 rounded-xl space-y-1">
@@ -3311,7 +3458,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         <span>20 MARKS</span>
                       </div>
                       <div className="font-serif font-bold text-white text-base">Comprehensive Exam</div>
-                      <p className="text-emerald-100 text-[11px]">Final comprehensive assessment of Semester 1.</p>
+                      <p className="text-emerald-100 text-[11px]">Final comprehensive assessment of {calendarSemester === "semester1" ? "Semester 1" : "Semester 2"}.</p>
                     </div>
                   </div>
                 </div>
@@ -7865,6 +8012,87 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           {fcSaving ? "💾 Saving Settings..." : "💾 Save & Deploy Free Course Settings"}
                         </button>
                       </form>
+
+                      {/* FREE COURSE LEARNERS ROSTER */}
+                      <div className="border-t border-emerald-100 dark:border-emerald-800 pt-8 mt-8 space-y-4">
+                        <div>
+                          <h4 className="text-base font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2 font-serif">
+                            <span>👥 Registered Free Course Learners ({fcEnrollments.length})</span>
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1">
+                            A list of students currently registered, their progressive learning percentage, and their final CBT exam score.
+                          </p>
+                        </div>
+
+                        {fcEnrollmentsLoading ? (
+                          <p className="text-xs text-emerald-600 animate-pulse font-bold">Loading learner records...</p>
+                        ) : fcEnrollments.length === 0 ? (
+                          <div className="p-6 bg-emerald-50/20 dark:bg-emerald-950/20 rounded-xl text-center border border-dashed border-emerald-200">
+                            <p className="text-xs text-slate-400">No students registered for the free class yet.</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto rounded-xl border border-emerald-100 dark:border-emerald-800 text-xs">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 dark:bg-emerald-950 text-emerald-950 dark:text-amber-100 font-bold uppercase text-[9px] tracking-wider border-b border-emerald-100 dark:border-emerald-800">
+                                  <th className="p-3 pl-4">Full Name</th>
+                                  <th className="p-3">WhatsApp Number</th>
+                                  <th className="p-3">Joined Date</th>
+                                  <th className="p-3">Learning Progress</th>
+                                  <th className="p-3">CBT Score</th>
+                                  <th className="p-3">Certificate</th>
+                                  <th className="p-3 pr-4 text-right">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-emerald-50/15">
+                                {fcEnrollments.map((student) => (
+                                  <tr key={student.id} className="hover:bg-slate-50/40 dark:hover:bg-emerald-950/20 text-emerald-900 dark:text-emerald-100">
+                                    <td className="p-3 pl-4 font-bold">{student.name}</td>
+                                    <td className="p-3 font-mono text-[11px]">{student.whatsapp}</td>
+                                    <td className="p-3 text-slate-450">{student.joinedAt ? new Date(student.joinedAt).toLocaleDateString() : "—"}</td>
+                                    <td className="p-3">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-24 bg-slate-100 dark:bg-emerald-950 rounded-full h-2 overflow-hidden border border-emerald-200/20">
+                                          <div className="bg-emerald-600 h-full rounded-full" style={{ width: `${student.progress || 0}%` }} />
+                                        </div>
+                                        <span className="font-mono text-[10px] font-bold text-emerald-800 dark:text-amber-300">{student.progress || 0}%</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-3">
+                                      {student.examScore !== null && student.examScore !== undefined ? (
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${student.examScore >= 4 ? "bg-emerald-100 text-emerald-850 dark:bg-emerald-950 dark:text-emerald-200" : "bg-red-50 text-red-750"}`}>
+                                          {student.examScore} / 5 ({student.examScore >= 4 ? "PASSED" : "FAILED"})
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 text-[10px]">No Attempt</span>
+                                      )}
+                                    </td>
+                                    <td className="p-3">
+                                      {student.completed ? (
+                                        <span className="px-2 py-0.5 bg-amber-500 text-emerald-950 font-bold rounded text-[9px] uppercase tracking-wide">
+                                          Issued 🎓
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400">—</span>
+                                      )}
+                                    </td>
+                                    <td className="p-3 pr-4 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteFcEnrollment(student.id, student.name)}
+                                        className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-all cursor-pointer inline-flex items-center gap-1 font-bold text-[10px]"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>Delete</span>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -8497,13 +8725,31 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           </div>
                           <div className="space-y-1">
                             <span className="font-bold text-emerald-700 block">YouTube Embed URL / Audio Stream URL</span>
-                            <input
-                              type="text"
-                              placeholder="https://www.youtube.com/embed/8I869l_5mYg"
-                              value={newSermonUrl}
-                              onChange={(e) => setNewSermonUrl(e.target.value)}
-                              className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
-                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="https://www.youtube.com/embed/8I869l_5mYg"
+                                value={newSermonUrl}
+                                onChange={(e) => setNewSermonUrl(e.target.value)}
+                                className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                              />
+                              <div className="relative shrink-0">
+                                <input
+                                  type="file"
+                                  accept="audio/*,video/*"
+                                  onChange={handleSermonMediaUpload}
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                />
+                                <button type="button" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer">
+                                  Upload
+                                </button>
+                              </div>
+                            </div>
+                            {newSermonUrl?.startsWith("data:") && (
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                                ✓ Media file loaded from device ({Math.round(newSermonUrl.length / 1024)} KB)
+                              </div>
+                            )}
                           </div>
                           <div className="space-y-1">
                             <span className="font-bold text-emerald-700 block">Sermon Cover / Thumbnail Image</span>
@@ -8715,7 +8961,13 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 <option value="Aqeedah">Aqeedah & Creed</option>
                                 <option value="Hadith">Hadith Collections</option>
                                 <option value="Fiqh">Jurisprudence (Fiqh)</option>
-                                <option value="Arabic">Arabic Grammar & Language</option>
+                                <option value="Tafsir">Quran Tafsir</option>
+                                <option value="Arabic">Arabic Language</option>
+                                <option value="Nahw">Arabic Grammar (Nahw)</option>
+                                <option value="Sarf">Morphology (Sarf)</option>
+                                <option value="Seerah">Prophetic Biography (Seerah)</option>
+                                <option value="Poetry">Poetry (Mutun)</option>
+                                <option value="History">Islamic History</option>
                               </select>
                             </div>
                             <div className="space-y-1">
@@ -8728,6 +8980,35 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
                               />
                             </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <span className="font-bold text-emerald-700 block">Book PDF Document (Upload File or Enter URL)</span>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="https://example.com/book.pdf or loaded from device..."
+                                value={newBookDownloadUrl}
+                                onChange={(e) => setNewBookDownloadUrl(e.target.value)}
+                                className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                              />
+                              <div className="relative shrink-0">
+                                <input
+                                  type="file"
+                                  accept="application/pdf"
+                                  onChange={handleBookPdfUpload}
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                />
+                                <button type="button" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif">
+                                  Upload PDF
+                                </button>
+                              </div>
+                            </div>
+                            {newBookDownloadUrl?.startsWith("data:") && (
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                                ✓ PDF file loaded from device ({Math.round(newBookDownloadUrl.length / 1024)} KB)
+                              </div>
+                            )}
                           </div>
 
                           <div className="space-y-1">
