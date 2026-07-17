@@ -1780,7 +1780,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     if (!file) return;
 
     if (file.size > 15 * 1024 * 1024) {
-      alert("⚠️ Warning: This PDF is quite large (" + Math.round(file.size / 1024 / 1024) + "MB). It might cause upload issues. Consider using an external download link for larger documents.");
+      alert("❌ PDF File Too Large: To prevent mobile browser memory crashes ('Aw, Snap!' errors), PDFs are strictly limited to under 15MB. Please upload a smaller file or use an external URL link.");
+      return;
     }
 
     const reader = new FileReader();
@@ -1807,7 +1808,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     if (!file) return;
 
     if (file.size > 15 * 1024 * 1024) {
-      alert("⚠️ Warning: This PDF is quite large (" + Math.round(file.size / 1024 / 1024) + "MB). It might cause upload issues. Consider using an external download link for larger documents.");
+      alert("❌ PDF File Too Large: To prevent mobile browser memory crashes ('Aw, Snap!' errors), PDFs are strictly limited to under 15MB. Please upload a smaller file or use an external URL link.");
+      return;
     }
 
     const reader = new FileReader();
@@ -9506,13 +9508,26 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             <div className="space-y-1">
                               <span className="font-bold text-emerald-700 block">Cover Image (Upload or Enter URL)</span>
                               <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="https://images.unsplash.com/... or uploaded file"
-                                  value={newBookCoverUrl}
-                                  onChange={(e) => setNewBookCoverUrl(e.target.value)}
-                                  className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
-                                />
+                                {newBookCoverUrl?.startsWith("data:") ? (
+                                  <div className="flex-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded px-3 py-2 text-xs text-emerald-950 dark:text-white font-mono">
+                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">✓ Image Loaded ({Math.round(newBookCoverUrl.length / 1024)} KB)</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewBookCoverUrl("")}
+                                      className="ml-2 px-2 py-0.5 bg-red-100 hover:bg-red-200 dark:bg-red-950/50 dark:hover:bg-red-900 text-red-700 dark:text-red-300 rounded font-bold text-[10px] uppercase transition-colors"
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    placeholder="https://images.unsplash.com/... or uploaded file"
+                                    value={newBookCoverUrl}
+                                    onChange={(e) => setNewBookCoverUrl(e.target.value)}
+                                    className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                                  />
+                                )}
                                 <label htmlFor="book-cover-file-input" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
                                   Upload Cover
                                 </label>
@@ -9524,24 +9539,32 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   className="hidden"
                                 />
                               </div>
-                              {newBookCoverUrl?.startsWith("data:") && (
-                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
-                                  ✓ Cover image loaded from device ({Math.round(newBookCoverUrl.length / 1024)} KB)
-                                </div>
-                              )}
                             </div>
                           </div>
 
                           <div className="space-y-1">
                             <span className="font-bold text-emerald-700 block">Book PDF Document (Upload File or Enter URL)</span>
                             <div className="flex gap-2">
-                              <input
-                                type="text"
-                                placeholder="https://example.com/book.pdf or loaded from device..."
-                                value={newBookDownloadUrl}
-                                onChange={(e) => setNewBookDownloadUrl(e.target.value)}
-                                className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
-                              />
+                              {newBookDownloadUrl?.startsWith("data:") ? (
+                                <div className="flex-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded px-3 py-2 text-xs text-emerald-950 dark:text-white font-mono">
+                                  <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">✓ PDF Document Loaded ({Math.round(newBookDownloadUrl.length / 1024)} KB)</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewBookDownloadUrl("")}
+                                    className="ml-2 px-2 py-0.5 bg-red-100 hover:bg-red-200 dark:bg-red-950/50 dark:hover:bg-red-900 text-red-700 dark:text-red-300 rounded font-bold text-[10px] uppercase transition-colors"
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  placeholder="https://example.com/book.pdf or loaded from device..."
+                                  value={newBookDownloadUrl}
+                                  onChange={(e) => setNewBookDownloadUrl(e.target.value)}
+                                  className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                                />
+                              )}
                               <label htmlFor="book-pdf-file-input" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
                                 Upload PDF
                               </label>
@@ -9553,11 +9576,6 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 className="hidden"
                               />
                             </div>
-                            {newBookDownloadUrl?.startsWith("data:") && (
-                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
-                                ✓ PDF file loaded from device ({Math.round(newBookDownloadUrl.length / 1024)} KB)
-                              </div>
-                            )}
                           </div>
 
                           <div className="space-y-1">
@@ -9694,13 +9712,26 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             <div className="space-y-1">
                               <span className="font-bold text-emerald-700 block">Poem Cover/Illustration (Upload or Enter URL)</span>
                               <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="https://images.unsplash.com/... or uploaded file"
-                                  value={newPoemCoverUrl}
-                                  onChange={(e) => setNewPoemCoverUrl(e.target.value)}
-                                  className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
-                                />
+                                {newPoemCoverUrl?.startsWith("data:") ? (
+                                  <div className="flex-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded px-3 py-2 text-xs text-emerald-950 dark:text-white font-mono">
+                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">✓ Image Loaded ({Math.round(newPoemCoverUrl.length / 1024)} KB)</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewPoemCoverUrl("")}
+                                      className="ml-2 px-2 py-0.5 bg-red-100 hover:bg-red-200 dark:bg-red-950/50 dark:hover:bg-red-900 text-red-700 dark:text-red-300 rounded font-bold text-[10px] uppercase transition-colors"
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    placeholder="https://images.unsplash.com/... or uploaded file"
+                                    value={newPoemCoverUrl}
+                                    onChange={(e) => setNewPoemCoverUrl(e.target.value)}
+                                    className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                                  />
+                                )}
                                 <label htmlFor="poem-cover-file-input" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
                                   Upload Image
                                 </label>
@@ -9712,23 +9743,31 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   className="hidden"
                                 />
                               </div>
-                              {newPoemCoverUrl?.startsWith("data:") && (
-                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
-                                  ✓ Cover image loaded from device ({Math.round(newPoemCoverUrl.length / 1024)} KB)
-                                </div>
-                              )}
                             </div>
 
                             <div className="space-y-1">
                               <span className="font-bold text-emerald-700 block">Poem PDF Document (Upload File or Enter URL)</span>
                               <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="https://example.com/poem.pdf or loaded from device..."
-                                  value={newPoemPdfUrl}
-                                  onChange={(e) => setNewPoemPdfUrl(e.target.value)}
-                                  className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
-                                />
+                                {newPoemPdfUrl?.startsWith("data:") ? (
+                                  <div className="flex-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded px-3 py-2 text-xs text-emerald-950 dark:text-white font-mono">
+                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">✓ PDF Document Loaded ({Math.round(newPoemPdfUrl.length / 1024)} KB)</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewPoemPdfUrl("")}
+                                      className="ml-2 px-2 py-0.5 bg-red-100 hover:bg-red-200 dark:bg-red-950/50 dark:hover:bg-red-900 text-red-700 dark:text-red-300 rounded font-bold text-[10px] uppercase transition-colors"
+                                    >
+                                      Clear
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    placeholder="https://example.com/poem.pdf or loaded from device..."
+                                    value={newPoemPdfUrl}
+                                    onChange={(e) => setNewPoemPdfUrl(e.target.value)}
+                                    className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                                  />
+                                )}
                                 <label htmlFor="poem-pdf-file-input" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
                                   Upload PDF
                                 </label>
@@ -9740,11 +9779,6 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   className="hidden"
                                 />
                               </div>
-                              {newPoemPdfUrl?.startsWith("data:") && (
-                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
-                                  ✓ PDF file loaded from device ({Math.round(newPoemPdfUrl.length / 1024)} KB)
-                                </div>
-                              )}
                             </div>
                           </div>
 
