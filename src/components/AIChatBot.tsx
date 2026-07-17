@@ -62,7 +62,13 @@ export default function AIChatBot({ isArabic }: AIChatBotProps) {
     fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: textToSend })
+      body: JSON.stringify({ 
+        message: textToSend,
+        history: messages.map((m) => ({
+          role: m.sender === "user" ? "user" : "model",
+          content: m.text
+        }))
+      })
     })
       .then((res) => {
         if (!res.ok) {

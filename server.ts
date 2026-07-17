@@ -2507,10 +2507,280 @@ app.get("/api/search", (req, res) => {
 // AI Chat Support Grounded Endpoint using Gemini API
 // (Uses @google/genai as required)
 import { GoogleGenAI } from "@google/genai";
+
+function findLocalIslamicAcademyAnswer(msg: string): string | null {
+  const query = msg.toLowerCase().trim();
+
+  // 1. Student register / Portal / Access / Log in
+  if (
+    query.includes("student portal") ||
+    query.includes("register") ||
+    query.includes("enroll") ||
+    query.includes("log in") ||
+    query.includes("بوابة") ||
+    query.includes("تسجيل") ||
+    query.includes("الولوج") ||
+    query.includes("دخول")
+  ) {
+    if (query.includes("واجب") || query.includes("worksheet") || query.includes("recitation") || query.includes("تلاو") || query.includes("صوت")) {
+      // Fall through to worksheet section
+    } else {
+      return `As-salamu alaykum! 
+Here is how to register and access your Student Portal:
+1. Click the **"Portal Access" (or "بوابة الدخول")** button at the top-right corner of the website's navigation bar.
+2. Under the **Student Portal** tab, click **"Register"** to create a brand new account, or type your credentials if you are already registered.
+3. Once logged in, your Student Dashboard will display all your active and enrolled courses (e.g., Al-Ajurrumiyyah, Tajweed, Aqeedah).
+4. Within each course page, you can review lesson materials, view course announcements, and complete homework tasks!`;
+    }
+  }
+
+  // 2. Worksheets / Submitting / Recitation / Audio
+  if (
+    query.includes("worksheet") ||
+    query.includes("submit") ||
+    query.includes("homework") ||
+    query.includes("recitation") ||
+    query.includes("audio") ||
+    query.includes("file") ||
+    query.includes("واجب") ||
+    query.includes("تلاو") ||
+    query.includes("تسليم") ||
+    query.includes("صوت")
+  ) {
+    return `As-salamu alaykum! 
+Submitting assignments and recording audio recitations is built directly into our Student Portal:
+1. Log in to your **Student Portal** (via "Portal Access" on top).
+2. Open your active course and scroll down to the **"Worksheets"** section.
+3. You can:
+   - Type your answers directly into the online text area.
+   - Upload homework files, images, or documents (we support fast high-performance file uploads up to 150MB!).
+   - **Record your voice recitation live**: Click the microphone icon to record your Quran recitation or Tajweed practice directly using your device's mic, listen to it, and submit!
+4. Click **"Submit Homework"**. Your teacher will instantly receive it to listen, review, and leave a grade and audio/text feedback!`;
+  }
+
+  // 3. Free courses / Laamiyyatu / Poetry / Audio
+  if (
+    query.includes("free course") ||
+    query.includes("laamiy") ||
+    query.includes("poem") ||
+    query.includes("poetry") ||
+    query.includes("لامي") ||
+    query.includes("شعر") ||
+    query.includes("ديوان") ||
+    query.includes("مجاني")
+  ) {
+    return `As-salamu alaykum! 
+Our Academy features a dedicated Library and Free Courses system:
+1. Click on the **"Free Courses"** or **"Poetry Library"** tabs in the main navigation menu.
+2. Here, you will find beautiful classical texts such as Ibn Taymiyyah's **"Laamiyyatu" (قصيدة اللامية)**.
+3. You can click the **"Play Audio"** button to listen to clear, beautifully mastered vocal recitations of these classical poems.
+4. You can also view the full Arabic text directly on your screen or download the entire curriculum books as PDF documents.`;
+  }
+
+  // 4. Teacher management / Course / Grade
+  if (
+    query.includes("teacher") ||
+    query.includes("manage") ||
+    query.includes("grade") ||
+    query.includes("upload") ||
+    query.includes("درس") ||
+    query.includes("إدارة") ||
+    query.includes("معلم") ||
+    query.includes("أستاذ") ||
+    query.includes("درجات")
+  ) {
+    return `As-salamu alaykum! 
+Teachers have robust, professional management panels on our platform:
+1. Click **"Portal Access"** in the top-right menu and log in using your Teacher credentials.
+2. From your Teacher Dashboard, you can:
+   - **Create and edit courses**: Set up curricula, syllabus texts, and upload course reference books (PDF files up to 150MB).
+   - **Grade Student Recitations**: Listen to audio recordings submitted by students, view their uploaded files/homework, and input grades with custom text feedback.
+   - **Sermon TV & Notices**: Add video broadcasts to the Academy's live stream and post news.`;
+  }
+
+  // 5. Calendar / Event / Schedule
+  if (
+    query.includes("calendar") ||
+    query.includes("event") ||
+    query.includes("date") ||
+    query.includes("schedule") ||
+    query.includes("تقويم") ||
+    query.includes("حدث") ||
+    query.includes("مواعيد") ||
+    query.includes("جدول")
+  ) {
+    return `As-salamu alaykum! 
+Our interactive School Calendar keeps the entire Madrasah coordinated:
+1. Visitors can view all scheduled events by opening the calendar widget.
+2. Teachers and administrators can add new calendar events (such as live webinars, classes, or public Islamic lectures) by logging into their Teacher Portal.
+3. Any added event instantly updates on the public schedule for everyone!`;
+  }
+
+  // 6. About / Mission / Vision / Academy
+  if (
+    query.includes("about") ||
+    query.includes("mission") ||
+    query.includes("vision") ||
+    query.includes("academy") ||
+    query.includes("منهج") ||
+    query.includes("رؤية") ||
+    query.includes("أكاديمية") ||
+    query.includes("من نحن")
+  ) {
+    return `As-salamu alaykum! 
+**Abu Qoonitah Islamic Academy** is a premier online Madrasah focused on providing authentic and pure Islamic knowledge based strictly on the Quran and Sunnah according to the understanding of the righteous predecessors (Salaf-us-Salih).
+We offer professional, structured curriculums covering:
+- **Quranic Sciences**: Memorization (Hifdh) and precise rules of Tajweed.
+- **Arabic Language**: Classical Grammar (Nahw through Al-Ajurrumiyyah), Morphology (Sarf), and rhetoric.
+- **Creed & Jurisprudence**: Authentic Aqeedah (such as Al-Wasiyyah) and Islamic Fiqh tracks.`;
+  }
+
+  // 7. Library / Books / Download
+  if (
+    query.includes("library") ||
+    query.includes("books") ||
+    query.includes("download") ||
+    query.includes("مكتبة") ||
+    query.includes("كتب") ||
+    query.includes("تنزيل") ||
+    query.includes("تحميل")
+  ) {
+    return `As-salamu alaykum! 
+We host twin libraries to satisfy students and seekers of knowledge:
+1. **Islamic Library**: Houses classical source books of Tafsir, Hadith, Aqeedah, and Fiqh (e.g., Riyadh As-Saliheen).
+2. **Poetry Library**: Offers classical Arabic poems in clean typography with offline download buttons.
+3. You can search libraries using the instant search bar and download study materials directly to your device!`;
+  }
+
+  // 8. Donate / Support / Bank Transfer / Receipt
+  if (
+    query.includes("donate") ||
+    query.includes("support") ||
+    query.includes("money") ||
+    query.includes("payment") ||
+    query.includes("receipt") ||
+    query.includes("تبرع") ||
+    query.includes("دعم") ||
+    query.includes("صدقة") ||
+    query.includes("إيصال")
+  ) {
+    return `As-salamu alaykum! 
+Supporting Islamic education is a magnificent form of Sadaqah Jariyah. Here is how you can support the academy:
+1. Click the **"Donate Now"** tab in the navigation menu.
+2. Fill out your name, email, and the amount you wish to contribute.
+3. You can securely simulate a card payment, OR make a direct bank transfer and upload your receipt document/photo (up to 150MB) directly through the donation form to keep our educational materials free!`;
+  }
+
+  // 9. Contact / Whatsapp
+  if (
+    query.includes("contact") ||
+    query.includes("whatsapp") ||
+    query.includes("phone") ||
+    query.includes("number") ||
+    query.includes("تواصل") ||
+    query.includes("واتس") ||
+    query.includes("رقم")
+  ) {
+    return `As-salamu alaykum! 
+You can communicate directly with Abu Qoonitah:
+- Click the floating green **WhatsApp icon** located at the bottom-right corner of any page.
+- Direct mobile number/WhatsApp: **08122455759**. We look forward to hearing from you!`;
+  }
+
+  // 10. Weather / Solar / Salat / Prayer / Refraction / Hijrah / Time / Splat
+  if (
+    query.includes("weather") ||
+    query.includes("solar") ||
+    query.includes("salat") ||
+    query.includes("prayer") ||
+    query.includes("refraction") ||
+    query.includes("hijrah") ||
+    query.includes("hijri") ||
+    query.includes("time") ||
+    query.includes("splat") ||
+    query.includes("طقس") ||
+    query.includes("صلاة") ||
+    query.includes("هجري") ||
+    query.includes("وقت") ||
+    query.includes("شمس")
+  ) {
+    return `As-salamu alaykum! 
+Our platform features an interactive weather, solar time, and Salat tracking engine in the Footer:
+1. **Atmospheric Weather Selector**: Adjust weather conditions (Sunny, Cloudy, Rainy, Overcast) in the footer to simulate changes in atmospheric density refraction!
+2. **Apparent Solar Time**: Apparent solar time is calculated live using the sinusoidal Equation of Time (EOT) formula, shifting dynamically with the weather refraction index.
+3. **Splat (Salat) Prayer Times**: Adjusted automatically based on the Ibadan, Nigeria geographical coordinates (7.3775° N, 3.9470° E), modulated in real-time by your atmospheric weather settings.
+4. **Hijrah Date**: Generates a live, authentic Hijri calendar date in Arabic and English using the official Umm al-Qura standard.`;
+  }
+
+  // 11. Nahw vs Sarf
+  if (
+    query.includes("nahw") ||
+    query.includes("sarf") ||
+    query.includes("صرف") ||
+    query.includes("نحو") ||
+    query.includes("قواعد")
+  ) {
+    return `As-salamu alaykum! 
+Here is the core difference between Nahw and Sarf in the Arabic language:
+1. **Nahw (Arabic Grammar / النحو)**: Concerned with the endings of Arabic words inside sentences (e.g. Dammah, Fathah, Kasrah) and how their positions change meaning. It is studied via classical texts like *Al-Ajurrumiyyah*.
+2. **Sarf (Arabic Morphology / الصرف)**: Focuses on the internal structure, conjugation, and derivation of the words themselves (e.g., how the root verb *k-t-b* conjugate into *kataba*, *yaktubu*, *kitab*, *katib*, etc.).`;
+  }
+
+  // 12. Noon Sakinah
+  if (
+    query.includes("noon sakinah") ||
+    query.includes("tajweed") ||
+    query.includes("tanween") ||
+    query.includes("تجويد") ||
+    query.includes("نون") ||
+    query.includes("تنوي")
+  ) {
+    return `As-salamu alaykum! 
+The rules of Noon Sakinah and Tanween (Sakinah N and double vowels) in Tajweed are four fundamental practices:
+1. **Izhaar (الإظهار - Clarity)**: Pronouncing the Noon sound clearly without extra nasalization when followed by throat letters: \`ء , هـ , ع , ح , غ , خ\`
+2. **Idghaam (الإدغام - Merging)**: Merging the Noon into the following letter. Merged with ghunnah (nasal sound) for letters \`ي , ن , م , و\`, or without ghunnah for letters \`ل , ر\`.
+3. **Iqlaab (الإقلاب - Conversion)**: Changing the Noon sound into a soft "Meem" sound with ghunnah when followed by the letter \`ب\`.
+4. **Ikhfaa (الإخفاء - Concealment)**: Concealing the Noon sound with a light nasal tone when followed by any of the remaining 15 letters.`;
+  }
+
+  // 13. Pillars of Salah
+  if (
+    query.includes("pillar") ||
+    query.includes("salah") ||
+    query.includes("shuroot") ||
+    query.includes("صلو") ||
+    query.includes("ركع") ||
+    query.includes("أركان") ||
+    query.includes("شروط")
+  ) {
+    return `As-salamu alaykum! 
+There are 14 essential pillars (Arkaan) of Salah (Prayer) which must be completed for the prayer to be valid:
+1. Standing during obligatory prayers if physically able.
+2. The opening Takbeer (saying "Allahu Akbar").
+3. Reciting Surah Al-Fatihah in every unit (Rak'ah).
+4. Ruku (bowing) and rising back to standing.
+5. Sujood (prostrating on seven bones: forehead/nose, two hands, two knees, and the toes of both feet).
+6. Sitting upright between the two prostrations.
+7. Tranquility (Tuma'neenah) and calm in every single physical movement.
+8. The final Tashahhud and sitting for it.
+9. Saying prayers upon the Prophet (Sallallahu Alayhi Wa Sallam).
+10. The Tasleem (saying "As-salamu alaykum wa rahmatullah" to the right and left).`;
+  }
+
+  return null;
+}
+
 app.post("/api/chat", async (req, res) => {
   const { message, history } = req.body;
   if (!message) {
     res.status(400).json({ error: "Message is required" });
+    return;
+  }
+
+  // First check if we can respond instantly with highly detailed local curriculum/site tutor content
+  const localAnswer = findLocalIslamicAcademyAnswer(message);
+  if (localAnswer) {
+    res.json({ reply: localAnswer });
     return;
   }
 
@@ -2519,7 +2789,7 @@ app.post("/api/chat", async (req, res) => {
     if (!apiKey) {
       // Graceful fallback if API key is not yet set
       res.json({
-        reply: "As-salamu alaykum! Welcome to Abu Qoonitah Islamic Academy. (AI is currently in local mode. Please set your GEMINI_API_KEY in the Secrets menu for full AI answers). How can I assist you with enrollment, courses, or navigating our Madrasah LMS?"
+        reply: "As-salamu alaykum! Welcome to Abu Qoonitah Islamic Academy. How can I assist you today? Feel free to ask me how to register as a student, how to use the teacher portal, how worksheets work, or how to view classical poetry and libraries!"
       });
       return;
     }
