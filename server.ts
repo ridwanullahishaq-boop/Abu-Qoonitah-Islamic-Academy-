@@ -7,6 +7,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import multer from "multer";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import { User, UserRole, Course, Submission, Donation, Book, Poem, Announcement, DiscussionMessage, DirectMessage, SchoolCalendarEvent, Testimonial } from "./src/types";
@@ -739,6 +740,55 @@ function authenticate(req: express.Request, res: express.Response, next: express
   (req as any).userId = sessions[token];
   next();
 }
+
+// --- DIRECT FILE UPLOADS SYSTEM ---
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Serve /uploads statically
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
+    const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+    cb(null, `${uniqueSuffix}-${sanitizedOriginalName}`);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 150 * 1024 * 1024 // 150MB maximum upload limit
+  }
+});
+
+app.post("/api/upload", authenticate, upload.single("file"), (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ error: "Access denied. Admins only." });
+    return;
+  }
+
+  if (!req.file) {
+    res.status(400).json({ error: "No file was uploaded." });
+    return;
+  }
+
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({
+    success: true,
+    fileUrl: fileUrl,
+    filename: req.file.filename,
+    size: req.file.size
+  });
+});
 
 // --- API ENDPOINTS ---
 

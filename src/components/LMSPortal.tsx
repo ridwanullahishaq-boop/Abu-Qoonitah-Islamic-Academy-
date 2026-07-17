@@ -370,6 +370,10 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [newPoemCoverUrl, setNewPoemCoverUrl] = useState("");
   const [libSaving, setLibSaving] = useState(false);
   const [libMessage, setLibMessage] = useState("");
+  const [isBookCoverUploading, setIsBookCoverUploading] = useState(false);
+  const [isBookPdfUploading, setIsBookPdfUploading] = useState(false);
+  const [isPoemCoverUploading, setIsPoemCoverUploading] = useState(false);
+  const [isPoemPdfUploading, setIsPoemPdfUploading] = useState(false);
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [editingPoemId, setEditingPoemId] = useState<string | null>(null);
 
@@ -1716,6 +1720,46 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     });
   }
 
+  // Convert compressed base64 images into raw binary blobs for seamless high-performance upload
+  const dataURLtoBlob = (dataurl: string): Blob => {
+    const arr = dataurl.split(",");
+    const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  };
+
+  // High-performance binary stream upload direct to server disk storage (supporting up to 150MB files)
+  const uploadFileToServer = async (file: File | Blob, originalFilename?: string): Promise<string> => {
+    const formData = new FormData();
+    if (file instanceof File) {
+      formData.append("file", file);
+    } else {
+      formData.append("file", file, originalFilename || "upload.jpg");
+    }
+
+    const token = localStorage.getItem("token") || "";
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `Upload failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.fileUrl;
+  };
+
   const handleFcCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1775,59 +1819,89 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     reader.readAsDataURL(file);
   };
 
-  const handleBookPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBookPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 15 * 1024 * 1024) {
-      alert("❌ PDF File Too Large: To prevent mobile browser memory crashes ('Aw, Snap!' errors), PDFs are strictly limited to under 15MB. Please upload a smaller file or use an external URL link.");
+    if (file.size > 150 * 1024 * 1024) {
+      alert("❌ PDF File Too Large: PDFs are strictly limited to under 150MB.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNewBookDownloadUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsBookPdfUploading(true);
+    setLibMessage("⏳ Uploading PDF directly to secure server storage...");
+    try {
+      const url = await uploadFileToServer(file);
+      setNewBookDownloadUrl(url);
+      setLibMessage("✓ PDF uploaded successfully to server!");
+    } catch (err: any) {
+      console.error("Error uploading book PDF:", err);
+      setLibMessage(`❌ PDF upload failed: ${err.message}`);
+    } finally {
+      setIsBookPdfUploading(false);
+    }
   };
 
   const handleBookCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsBookCoverUploading(true);
+    setLibMessage("⏳ Compressing and uploading cover image...");
     try {
       const compressed = await compressImage(file);
-      setNewBookCoverUrl(compressed);
-    } catch (err) {
+      const blob = dataURLtoBlob(compressed);
+      const url = await uploadFileToServer(blob, file.name);
+      setNewBookCoverUrl(url);
+      setLibMessage("✓ Cover image uploaded successfully!");
+    } catch (err: any) {
       console.error("Error compressing book cover:", err);
+      setLibMessage(`❌ Cover upload failed: ${err.message}`);
+    } finally {
+      setIsBookCoverUploading(false);
     }
   };
 
-  const handlePoemPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePoemPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 15 * 1024 * 1024) {
-      alert("❌ PDF File Too Large: To prevent mobile browser memory crashes ('Aw, Snap!' errors), PDFs are strictly limited to under 15MB. Please upload a smaller file or use an external URL link.");
+    if (file.size > 150 * 1024 * 1024) {
+      alert("❌ PDF File Too Large: Poem PDFs are strictly limited to under 150MB.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNewPoemPdfUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsPoemPdfUploading(true);
+    setLibMessage("⏳ Uploading PDF directly to secure server storage...");
+    try {
+      const url = await uploadFileToServer(file);
+      setNewPoemPdfUrl(url);
+      setLibMessage("✓ Poem PDF uploaded successfully to server!");
+    } catch (err: any) {
+      console.error("Error uploading poem PDF:", err);
+      setLibMessage(`❌ Poem PDF upload failed: ${err.message}`);
+    } finally {
+      setIsPoemPdfUploading(false);
+    }
   };
 
   const handlePoemCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsPoemCoverUploading(true);
+    setLibMessage("⏳ Compressing and uploading illustration...");
     try {
       const compressed = await compressImage(file);
-      setNewPoemCoverUrl(compressed);
-    } catch (err) {
+      const blob = dataURLtoBlob(compressed);
+      const url = await uploadFileToServer(blob, file.name);
+      setNewPoemCoverUrl(url);
+      setLibMessage("✓ Poem illustration uploaded successfully!");
+    } catch (err: any) {
       console.error("Error compressing poem cover:", err);
+      setLibMessage(`❌ Illustration upload failed: ${err.message}`);
+    } finally {
+      setIsPoemCoverUploading(false);
     }
   };
 
@@ -9508,9 +9582,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             <div className="space-y-1">
                               <span className="font-bold text-emerald-700 block">Cover Image (Upload or Enter URL)</span>
                               <div className="flex gap-2">
-                                {newBookCoverUrl?.startsWith("data:") ? (
+                                {isBookCoverUploading ? (
+                                  <div className="flex-1 flex items-center justify-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-3 py-2 text-xs text-amber-800 dark:text-amber-200 font-bold">
+                                    <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-amber-700 border-t-transparent rounded-full"></span>
+                                    <span>⏳ Compressing & Uploading Cover...</span>
+                                  </div>
+                                ) : (newBookCoverUrl?.startsWith("data:") || newBookCoverUrl?.startsWith("/uploads/")) ? (
                                   <div className="flex-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded px-3 py-2 text-xs text-emerald-950 dark:text-white font-mono">
-                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">✓ Image Loaded ({Math.round(newBookCoverUrl.length / 1024)} KB)</span>
+                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">
+                                      ✓ Cover Loaded ({newBookCoverUrl.startsWith("data:") ? "Device Local" : "Saved on Server"})
+                                    </span>
                                     <button
                                       type="button"
                                       onClick={() => setNewBookCoverUrl("")}
@@ -9535,6 +9616,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   id="book-cover-file-input"
                                   type="file"
                                   accept="image/*"
+                                  disabled={isBookCoverUploading}
                                   onChange={handleBookCoverUpload}
                                   className="hidden"
                                 />
@@ -9545,9 +9627,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           <div className="space-y-1">
                             <span className="font-bold text-emerald-700 block">Book PDF Document (Upload File or Enter URL)</span>
                             <div className="flex gap-2">
-                              {newBookDownloadUrl?.startsWith("data:") ? (
+                              {isBookPdfUploading ? (
+                                <div className="flex-1 flex items-center justify-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-3 py-2 text-xs text-amber-800 dark:text-amber-200 font-bold">
+                                  <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-amber-700 border-t-transparent rounded-full"></span>
+                                  <span>⏳ Uploading PDF to Server...</span>
+                                </div>
+                              ) : (newBookDownloadUrl?.startsWith("data:") || newBookDownloadUrl?.startsWith("/uploads/")) ? (
                                 <div className="flex-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded px-3 py-2 text-xs text-emerald-950 dark:text-white font-mono">
-                                  <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">✓ PDF Document Loaded ({Math.round(newBookDownloadUrl.length / 1024)} KB)</span>
+                                  <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">
+                                    ✓ PDF Document Loaded ({newBookDownloadUrl.startsWith("data:") ? "Device Local" : "Saved on Server"})
+                                  </span>
                                   <button
                                     type="button"
                                     onClick={() => setNewBookDownloadUrl("")}
@@ -9572,6 +9661,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 id="book-pdf-file-input"
                                 type="file"
                                 accept="application/pdf"
+                                disabled={isBookPdfUploading}
                                 onChange={handleBookPdfUpload}
                                 className="hidden"
                               />
@@ -9712,9 +9802,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             <div className="space-y-1">
                               <span className="font-bold text-emerald-700 block">Poem Cover/Illustration (Upload or Enter URL)</span>
                               <div className="flex gap-2">
-                                {newPoemCoverUrl?.startsWith("data:") ? (
+                                {isPoemCoverUploading ? (
+                                  <div className="flex-1 flex items-center justify-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-3 py-2 text-xs text-amber-800 dark:text-amber-200 font-bold">
+                                    <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-amber-700 border-t-transparent rounded-full"></span>
+                                    <span>⏳ Compressing & Uploading Illustration...</span>
+                                  </div>
+                                ) : (newPoemCoverUrl?.startsWith("data:") || newPoemCoverUrl?.startsWith("/uploads/")) ? (
                                   <div className="flex-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded px-3 py-2 text-xs text-emerald-950 dark:text-white font-mono">
-                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">✓ Image Loaded ({Math.round(newPoemCoverUrl.length / 1024)} KB)</span>
+                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">
+                                      ✓ Cover Loaded ({newPoemCoverUrl.startsWith("data:") ? "Device Local" : "Saved on Server"})
+                                    </span>
                                     <button
                                       type="button"
                                       onClick={() => setNewPoemCoverUrl("")}
@@ -9739,6 +9836,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   id="poem-cover-file-input"
                                   type="file"
                                   accept="image/*"
+                                  disabled={isPoemCoverUploading}
                                   onChange={handlePoemCoverUpload}
                                   className="hidden"
                                 />
@@ -9748,9 +9846,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             <div className="space-y-1">
                               <span className="font-bold text-emerald-700 block">Poem PDF Document (Upload File or Enter URL)</span>
                               <div className="flex gap-2">
-                                {newPoemPdfUrl?.startsWith("data:") ? (
+                                {isPoemPdfUploading ? (
+                                  <div className="flex-1 flex items-center justify-center gap-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded px-3 py-2 text-xs text-amber-800 dark:text-amber-200 font-bold">
+                                    <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-amber-700 border-t-transparent rounded-full"></span>
+                                    <span>⏳ Uploading PDF to Server...</span>
+                                  </div>
+                                ) : (newPoemPdfUrl?.startsWith("data:") || newPoemPdfUrl?.startsWith("/uploads/")) ? (
                                   <div className="flex-1 flex items-center justify-between bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded px-3 py-2 text-xs text-emerald-950 dark:text-white font-mono">
-                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">✓ PDF Document Loaded ({Math.round(newPoemPdfUrl.length / 1024)} KB)</span>
+                                    <span className="truncate font-bold text-emerald-800 dark:text-emerald-300">
+                                      ✓ PDF Document Loaded ({newPoemPdfUrl.startsWith("data:") ? "Device Local" : "Saved on Server"})
+                                    </span>
                                     <button
                                       type="button"
                                       onClick={() => setNewPoemPdfUrl("")}
@@ -9775,6 +9880,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   id="poem-pdf-file-input"
                                   type="file"
                                   accept="application/pdf"
+                                  disabled={isPoemPdfUploading}
                                   onChange={handlePoemPdfUpload}
                                   className="hidden"
                                 />
