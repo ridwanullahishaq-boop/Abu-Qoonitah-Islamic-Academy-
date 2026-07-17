@@ -3667,6 +3667,24 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
         
         {/* Left Side: Student/Teacher Profile & Menu Cards */}
         <div className="lg:col-span-3 space-y-6">
+          {/* Academy Brand Logo Sidebar Card */}
+          <div className="bg-white dark:bg-natural-dark rounded-3xl p-6 border border-emerald-50 dark:border-emerald-900/40 shadow-sm flex flex-col items-center justify-center space-y-3">
+            <img
+              src="/logo.png"
+              alt="Abu Qoonitah Islamic Academy Logo"
+              className="w-20 h-20 rounded-2xl shadow-md object-cover"
+              referrerPolicy="no-referrer"
+            />
+            <div className="text-center">
+              <h3 className="font-serif font-bold text-xs uppercase tracking-wider text-natural-green dark:text-amber-100">
+                Abu Qoonitah
+              </h3>
+              <p className="text-[9px] font-medium tracking-[0.2em] text-slate-400 dark:text-natural-gold uppercase mt-0.5">
+                Islamic Academy
+              </p>
+            </div>
+          </div>
+
           {/* User Profile Card */}
           <div className="bg-white dark:bg-natural-dark rounded-3xl p-6 border border-emerald-50 dark:border-emerald-900/40 shadow-sm text-center space-y-4">
             <div className="w-16 h-16 rounded-full bg-natural-green mx-auto flex items-center justify-center border border-natural-gold">

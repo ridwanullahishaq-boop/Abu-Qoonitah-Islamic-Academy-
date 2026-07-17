@@ -2543,11 +2543,7 @@ function findLocalIslamicAcademyAnswer(msg: string): string | null {
 
   let greetingPrefix = "";
   if (hasIslamicGreeting) {
-    if (query.includes("السلام") || query.includes("سلام")) {
-      greetingPrefix = "Wa alaikumus salaam wa rahmatullahi wa barakaatuh.\n\n";
-    } else {
-      greetingPrefix = "Wa alaikumus salaam wa rahmatullahi wa barakaatuh.\n\n";
-    }
+    greetingPrefix = "Wa alaikumus salaam wa rahmatullahi wa barakaatuh.\n\n";
   }
 
   // If it's ONLY an Islamic greeting, return the exact required response
@@ -2555,9 +2551,27 @@ function findLocalIslamicAcademyAnswer(msg: string): string | null {
     return "Wa alaikumus salaam wa rahmatullahi wa barakaatuh. How may I help you today?";
   }
 
-  // Handle general English greetings
+  // Detect Yoruba Language queries
+  const isYo = 
+    query.includes("bawo ni") || 
+    query.includes("e ku o") || 
+    query.includes("e n le") || 
+    query.includes("kabo") || 
+    query.includes("elo ni") || 
+    query.includes("owo ile iwe") || 
+    query.includes("forukosile") || 
+    query.includes("eko") || 
+    query.includes("ile-iwe") || 
+    query.includes("san owo") || 
+    query.includes("se") || 
+    query.includes("ran mi lowo");
+
+  // Handle general English/Yoruba/Arabic greetings
   if (cleaned === "hello" || cleaned === "hi" || cleaned === "good morning" || cleaned === "good afternoon" || cleaned === "good evening") {
     return `As-salamu alaykum! Hello and welcome to Abu Qoonitah Islamic Academy. How may I assist you with your studies or enrollment today?`;
+  }
+  if (isYo && (query.includes("bawo") || query.includes("kabo") || query.includes("e ku"))) {
+    return `${greetingPrefix}Ẹ n lẹ́! Ẹ káàbọ̀ sí Abu Qoonitah Islamic Academy. Báwo ni mo ṣe le ràn yín lọ́wọ́ lónìí lórí ẹ̀kọ́ yín?`;
   }
 
   // 1. Tuition Fees & School Fees
@@ -2568,16 +2582,28 @@ function findLocalIslamicAcademyAnswer(msg: string): string | null {
     query.includes("need to pay") ||
     query.includes("what is the fee") ||
     query.includes("what are the fees") ||
-    query.includes("how much is") && (query.includes("fee") || query.includes("fees") || query.includes("cost") || query.includes("pay")) ||
+    query.includes("how much do i pay") ||
+    query.includes("how much is") && (query.includes("fee") || query.includes("fees") || query.includes("cost") || query.includes("pay") || query.includes("semester") || query.includes("tuition")) ||
     query.includes("course cost") ||
     query.includes("semester fee") ||
-    query.includes("how much do i pay") ||
+    query.includes("how much do i need to pay") ||
+    query.includes("cost of studying") ||
     query.includes("رسوم") ||
     query.includes("كم الرسوم") ||
     query.includes("كم ادفع") ||
     query.includes("كم تكلفة") ||
-    query.includes("سعر")
+    query.includes("سعر") ||
+    query.includes("owo ile iwe") ||
+    query.includes("elo ni") && (query.includes("san") || query.includes("iwe") || query.includes("owo"))
   ) {
+    if (isYo) {
+      return `${greetingPrefix}Owo ile-iwe (tuition fee) ni Abu Qoonitah Islamic Academy jẹ gẹgẹ bi a ti ṣe sọ ọ̀ lẹ́sẹẹsẹ yí:
+• **Owo Oṣooṣu (Monthly Payment)**: ₦5,000 NGN.
+• **Owo Saa Kan (Semester Tuition Fee)**: ₦15,000 NGN.
+
+Ti o ba sọ ipele (level) tabi ẹkọ pato ti o fẹ kọ, n o sọ owo ati alaye kikun fun ọ. O le fi ẹri isanwo (payment receipt) rẹ ranṣẹ lori Student Portal rẹ lati bẹrẹ ẹ̀kọ́!`;
+    }
+
     const isAr = query.includes("رسوم") || query.includes("كم") || query.includes("ادفع") || query.includes("تكلفة") || query.includes("سعر");
     if (isAr) {
       return `${greetingPrefix}الرسوم الدراسية المعتمدة في أكاديمية أبو قانتة الإسلامية هي كالتالي:
@@ -2587,11 +2613,7 @@ function findLocalIslamicAcademyAnswer(msg: string): string | null {
 إذا كنت مهتمًا بمستوى أو دورة معينة، يرجى إخباري بذلك حتى أتمكن من توفير كامل التفاصيل والجدول الدراسي. يمكنك تسليم إيصالات الدفع مباشرة عبر بوابة الطالب!`;
     }
 
-    return `${greetingPrefix}The official tuition fees for Abu Qoonitah Islamic Academy are as follows:
-- **Monthly Tuition Payment**: ₦5,000 NGN per month.
-- **Semester Tuition Fee**: ₦15,000 NGN per semester.
-
-If you tell me the specific course or level you are interested in (e.g. Beginner Spelling, Intermediate Zad Academic Class), I can provide the exact fee and programme details. You can submit bank transfer receipts under the Payments tab inside your Student Portal to activate locked courses!`;
+    return `${greetingPrefix}The tuition fee is ₦5,000 NGN for the Monthly Tuition Payment and ₦15,000 NGN for the Semester Tuition Fee. If you tell me the specific course or level you are interested in, I can also provide the exact fee and programme details.`;
   }
 
   // 2. Courses & Levels Offered
@@ -2601,12 +2623,32 @@ If you tell me the specific course or level you are interested in (e.g. Beginner
     query.includes("courses do you offer") ||
     query.includes("course offer") ||
     query.includes("list of courses") ||
+    query.includes("available courses") ||
+    query.includes("what subjects") ||
+    query.includes("mahrac") ||
+    query.includes("learn arabic") ||
+    query.includes("beginner") ||
     query.includes("ما هي المقررات") ||
     query.includes("ما هي الدورات") ||
     query.includes("الدورات المتاحة") ||
     query.includes("المقررات") ||
-    query.includes("الدورات")
+    query.includes("الدورات") ||
+    query.includes("eko") && (query.includes("wo") || query.includes("wa"))
   ) {
+    if (isYo) {
+      return `${greetingPrefix}Abu Qoonitah Islamic Academy n funni ni awọn ẹkọ pataki wọnyi:
+
+١. **Ipele Olubere (Beginner Class - Foundation Track)**:
+   - **Ipele Kinni (Level 1)**: Ẹkọ spelling ati kika ede Arabic (القراءة الصحيحة).
+   - **Ipele Keji (Level 2)**: Al-Quran (Juz Ammah), 100 Hadiths, Fiqh, ati Tawheed.
+   - **Ipele Kẹta (Level 3)**: Al-Quran (Juz Tabaarak), Arba'een An-Nawawiyyah (Hadith 40), Matn Al-Akhdori, ati Thalaathatul Usool.
+
+٢. **Ipele Agbedemeji (Intermediate Class - Zad Academic & Classical Books)**:
+   - Fiqh, Tawheed, Hadith, Ede Arabic (Grammar), ati Itan Igbesiaye Anabi (Seerah).
+
+Sọ fun mi ipele ti o ba ọ lara mu ki a bẹrẹ!`;
+    }
+
     const isAr = query.includes("ما هي") || query.includes("دورات") || query.includes("مقررات") || query.includes("المتاح");
     if (isAr) {
       return `${greetingPrefix}تقدم أكاديمية أبو قانتة الإسلامية المقررات والمستويات المنهجية التالية:
@@ -2617,8 +2659,8 @@ If you tell me the specific course or level you are interested in (e.g. Beginner
    - **المستوى الثالث**: حفظ جزء تبارك، الأربعين النووية، متن الأخضري في الفقه المالكي، وثلاثة الأصول.
 
 ٢. **المرحلة المتوسطة (كتاب زاد المستقنع والأكاديمي)**:
-   - **المستوى الأول (الفصل الأول والثاني)**: الفقه، التوحيد، الحديث، اللغة العربية (النحو والصرف)، والسيرة النبوية.
-   - **المستوى الثاني (الفصل الأول والثاني)**: دراسات متعمقة في الفقه، التوحيد، الحديث، العربية، والسيرة النبوية.
+   - **المستوى الأول (الفصل الأول والثاني)**: الفقه، التوحيد، الحديث، العربية، والسيرة النبوية.
+   - **المستوى الثاني (الفصل الأول والثاني)**: دراسات متعمقة في الفقه, التوحيد، الحديث، العربية، والسيرة النبوية.
 
 يسعدنا تسجيلك في أي من هذه المستويات من خلال بوابتك الأكاديمية!`;
     }
@@ -2631,24 +2673,38 @@ If you tell me the specific course or level you are interested in (e.g. Beginner
    - **Level 3**: Quran (Juz Tabaarak), 40 Hadiths (Arba'een An-Nawawiyyah), Matn Al-Akhdori in Fiqh, and Thalaathatul Usool (The Three Fundamental Principles).
 
 2. **Intermediate Class (Zad Academic & Classical Books)**:
-   - **Level 1 (First & Second Semesters)**: Fiqh (Jurisprudence), Monotheism (Tawheed), Hadith, Arabiyyah (Grammar/Syntax), and Seerah (Prophetic Biography).
+   - **Level 1 (First & Second Semesters)**: Fiqh (Jurisprudence), Monotheism (Tawheed), Hadith, Arabiyyah (Grammar/Syntax), and Prophetic Biography (Seerah).
    - **Level 2 (First & Second Semesters)**: Advanced modules in Fiqh, Tawheed, Hadith, Arabiyyah, and Seerah.
 
 All study programs are fully supervised with direct monitoring and worksheet/audio grading. Let me know which level you wish to enroll in!`;
   }
 
-  // 3. Registering / How to register
+  // 3. Registering / How to register / Enrol
   if (
     query.includes("how to register") ||
     query.includes("want to register") ||
     query.includes("register account") ||
     query.includes("how do i register") ||
     query.includes("registration process") ||
+    query.includes("how to enrol") ||
+    query.includes("how to enroll") ||
+    query.includes("how do i enrol") ||
+    query.includes("how do i enroll") ||
     query.includes("كيفية التسجيل") ||
     query.includes("اريد التسجيل") ||
     query.includes("كيف اسجل") ||
-    query.includes("طريقة التسجيل")
+    query.includes("طريقة التسجيل") ||
+    query.includes("forukosile") ||
+    query.includes("bawo ni mo se le forukosile")
   ) {
+    if (isYo) {
+      return `${greetingPrefix}Eyi ni igbese lati forukọsilẹ ni ile-ẹkọ wa:
+1. Tẹ bọtini **"Portal Access"** ti o wa ni apa ọtun oke oju-iwe wa.
+2. Labẹ tabili **"Student Portal"**, tẹ lori **"Register"** lati ṣẹda akọọlẹ tuntun.
+3. Tẹ Orukọ rẹ, Orukọ olumulo (Username), Imeeli rẹ, ati Ọrọ igbaniwọle (Password) rẹ.
+4. Lẹhin ti o ba forukọsilẹ, o le wọle (login) lẹsẹkẹsẹ lati wo gbogbo awọn akọsilẹ rẹ, kopa ninu idanwo, ki o si gbasilẹ awọn ohun elo rẹ!`;
+    }
+
     const isAr = query.includes("تسجيل") || query.includes("كيف") || query.includes("اريد");
     if (isAr) {
       return `${greetingPrefix}إليك طريقة التسجيل في الأكاديمية خطوة بخطوة:
@@ -2658,36 +2714,58 @@ All study programs are fully supervised with direct monitoring and worksheet/aud
 ٤. بعد تسجيل الحساب، ستتمكن من الدخول مباشرة إلى بوابتك الأكاديمية، استعراض المناهج، حل الواجبات، ومتابعة درجاتك وتسميعك الصوتي!`;
     }
 
-    return `${greetingPrefix}Here is the step-by-step process to register an account at Abu Qoonitah Islamic Academy:
+    return `${greetingPrefix}Here is the step-by-step process to register an account and enrol at Abu Qoonitah Islamic Academy:
 1. Click on the **"Portal Access"** button located at the top-right corner of the navigation bar.
 2. Under the **Student Portal** tab, click on **"Register"** to set up a new account.
 3. Input your Full Name, desired Username, Email address, and a secure Password.
 4. Once registered, you can log in instantly to view all courses, download study books, submit worksheets, and record audio recitations for teacher evaluation!`;
   }
 
-  // 4. Class Schedule & Calender
+  // 4. Duration of programmes
+  if (
+    query.includes("how long") ||
+    query.includes("duration of") ||
+    query.includes("programme duration") ||
+    query.includes("how many weeks") ||
+    query.includes("learning duration") ||
+    query.includes("مدة الدراسة") ||
+    query.includes("كم مدة") ||
+    query.includes("مدة البرنامج")
+  ) {
+    const isAr = query.includes("مدة") || query.includes("كم");
+    if (isAr) {
+      return `${greetingPrefix}تتراوح مدة المقررات والدورات الدراسية لدينا بين ٦ أسابيع إلى ١٠ أسابيع لكل فصل دراسي أو مستوى، وهي مصممة لتكون مرنة ومناسبة لجميع الطلاب بما يتلاءم مع مشاغلهم اليومية.`;
+    }
+    return `${greetingPrefix}The duration of our academic programs generally ranges from 6 to 10 weeks per course level or semester, allowing for flexible, self-paced learning that easily fits into busy daily routines.`;
+  }
+
+  // 5. Class Schedule & Calendar & Studying while busy
   if (
     query.includes("schedule") ||
     query.includes("calendar") ||
     query.includes("when are the classes") ||
     query.includes("class times") ||
+    query.includes("busy during the day") ||
+    query.includes("can i still study") ||
+    query.includes("study here") && query.includes("busy") ||
+    query.includes("time of classes") ||
     query.includes("تقويم") ||
     query.includes("جدول") ||
     query.includes("مواعيد")
   ) {
-    const isAr = query.includes("تقويم") || query.includes("جدول") || query.includes("مواعيد");
+    const isAr = query.includes("تقويم") || query.includes("جدول") || query.includes("مواعيد") || query.includes("مشغول");
     if (isAr) {
-      return `${greetingPrefix}الجدول الدراسي لدينا مرن ويتم تحديثه أسبوعياً:
-- يمكنك مراجعة كافة المواعيد واللقاءات والمحاضرات المباشرة من خلال جدول التقويم التفاعلي المتواجد على الصفحة الرئيسية.
-- يمتلك المدرسون والمسؤولون إمكانية إضافة وتحديث الحلقات والمواعيد مباشرة من لوحة التحكم لتظهر لجميع الطلاب والزوار فوراً.`;
+      return `${greetingPrefix}نعم بكل تأكيد! دراستنا مرنة ومصممة لتلائم المشغولين طوال اليوم:
+- الدروس والكتب والواجبات مسجلة ومتاحة ٢٤ ساعة طوال أيام الأسبوع في بوابة الطالب الخاصة بك لتدرس في الوقت الذي يناسبك.
+- يمكنك أيضاً متابعة مواعيد المحاضرات المباشرة واللقاءات الدورية من خلال جدول التقويم التفاعلي بالصفحة الرئيسية.`;
     }
 
-    return `${greetingPrefix}Our class schedule is highly flexible and dynamically updated:
-- You can view all active and upcoming classes, live webinars, and public lectures via the interactive **Calendar** widget displayed on the platform.
-- Certified teachers update the schedule weekly directly from their panels so you always have the most up-to-date timings!`;
+    return `${greetingPrefix}Yes, absolutely! Our academy is fully designed to support busy students:
+- All study books, lessons, and assignments are accessible 24/7 inside your private Student Portal, meaning you can study at your own pace and convenience (even late at night or during weekends).
+- You can keep track of any scheduled live webinars or virtual sessions using the interactive **Calendar** widget on the website homepage.`;
   }
 
-  // 5. Examinations, Assignments, and Certificates
+  // 6. Examinations, Assignments, and Certificates
   if (
     query.includes("exam") ||
     query.includes("quiz") ||
@@ -2696,26 +2774,37 @@ All study programs are fully supervised with direct monitoring and worksheet/aud
     query.includes("worksheet") ||
     query.includes("certificate") ||
     query.includes("submit homework") ||
+    query.includes("cbt") ||
+    query.includes("oral") ||
+    query.includes("result") ||
+    query.includes("view result") ||
+    query.includes("download materials") ||
+    query.includes("course materials") ||
+    query.includes("learn-materials") ||
+    query.includes("gbasile") ||
+    query.includes("paper") ||
     query.includes("اختبار") ||
     query.includes("واجب") ||
     query.includes("شهادة") ||
     query.includes("تسميع")
   ) {
-    const isAr = query.includes("اختبار") || query.includes("واجب") || query.includes("شهادة") || query.includes("تسميع");
+    const isAr = query.includes("اختبار") || query.includes("واجب") || query.includes("شهادة") || query.includes("تسميع") || query.includes("نتائج");
     if (isAr) {
-      return `${greetingPrefix}نظام التقييم والشهادات في الأكاديمية متكامل وتلقائي:
-- **الواجبات والتسميع**: يمكنك حل أوراق العمل وإدخال الإجابات، أو رفع ملفات مذكرات (حتى ١٥٠ ميجابايت)، أو تسجيل صوتك مباشرة تلاوة للقرآن ليقوم المعلم بتقييمها ووضع الدرجات والملحوظات الصوتية لك.
-- **الاختبارات**: تعقد اختبارات دورية في نهاية الفصول الدراسية والمستويات لقياس تقدمك.
-- **الشهادات**: بمجرد إتمامك لكافة الاختبارات وأوراق العمل بنجاح، سيقوم النظام تلقائياً بإنشاء شهادة تخرج رسمية بصيغة PDF موثقة باسمك يمكنك تحميلها وطباعتها فوراً من بوابة الطالب!`;
+      return `${greetingPrefix}نظام التقييم والشهادات والمناهج متكامل تماماً وتلقائي:
+- **الواجبات والتسميع**: يمكنك الدخول للمقرر، حل ورقة العمل، رفع الملفات والمذكرات (حتى ١٥٠ ميجابايت)، أو تسجيل صوتك مباشرة تلاوة للقرآن ليقوم المعلم بتقييمها ووضع الملحوظات الصوتية لك.
+- **الاختبارات (CBT & الشفهية)**: تجرى اختبارات دورية آلية في نهاية الفصول الدراسية والمستويات.
+- **المناهج والكتب**: يمكنك تحميل الكتب والملفات بصيغة PDF مباشرة من بوابة الطالب أو قسم المكتبة.
+- **الشهادات والنتائج**: بمجرد اجتيازك لكافة الاختبارات والواجبات، يتم تلقائياً إصدار شهادة تخرج معتمدة بصيغة PDF باسمك يمكنك تحميلها وطباعتها فوراً من بوابة الطالب!`;
     }
 
-    return `${greetingPrefix}Abu Qoonitah Islamic Academy provides a rigorous, automated evaluation and certification system:
-- **Assignments & Worksheets**: In your Student Portal, you can type answers, upload homework documents or images (up to 150MB), or record your Quranic recitation/Tajweed voice live on the browser. Teachers listen to your audio files and input direct grades and feedback.
-- **Examinations**: Regular online quizzes and comprehensive exams are scheduled at the end of each course level.
-- **Certificates**: Upon passing all exams and worksheets, a personalized official Certificate of Graduation is instantly generated as a high-quality PDF, ready to download and print directly from your Student Dashboard!`;
+    return `${greetingPrefix}Abu Qoonitah Islamic Academy provides a complete digital academic system:
+- **Worksheets & Recitations**: Inside your Student Portal, select your course to view assigned worksheets. You can type answers, upload document/image files (up to 150MB), or record your voice/recitation live on the browser.
+- **Examinations (CBT & Oral)**: Automated computer-based tests (CBT) and oral exams are scheduled regularly. You can instantly view your grades, results, and teacher's voice feedback under the same course page.
+- **Course Materials**: All textbooks and curriculum syllabi can be downloaded as PDFs instantly.
+- **Certificates**: Upon passing all curriculum requirements, an official Certificate of Graduation is instantly generated as a high-quality PDF, ready to download and print from your Student Dashboard.`;
   }
 
-  // 6. Contact & Administration
+  // 7. Contact & Administration / Teacher information
   if (
     query.includes("contact") ||
     query.includes("whatsapp") ||
@@ -2723,11 +2812,15 @@ All study programs are fully supervised with direct monitoring and worksheet/aud
     query.includes("number") ||
     query.includes("tutor") ||
     query.includes("teacher") ||
+    query.includes("admin") ||
+    query.includes("abu qoonitah") ||
+    query.includes("sheikh") ||
     query.includes("تواصل") ||
     query.includes("واتس") ||
     query.includes("رقم") ||
     query.includes("مدرس") ||
-    query.includes("معلم")
+    query.includes("معلم") ||
+    query.includes("مدير")
   ) {
     const isAr = query.includes("تواصل") || query.includes("واتس") || query.includes("رقم") || query.includes("مدرس") || query.includes("معلم");
     if (isAr) {
@@ -2741,7 +2834,7 @@ All study programs are fully supervised with direct monitoring and worksheet/aud
 - Direct phone call or WhatsApp number: **08122455759**. We are happy to guide you!`;
   }
 
-  // 7. General Fallback for non-academy specific details where we don't have accurate database entries
+  // 8. General Fallback for non-academy specific details where we don't have accurate database entries
   if (
     query.includes("hostel") ||
     query.includes("dormitory") ||

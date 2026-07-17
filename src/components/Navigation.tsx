@@ -76,9 +76,12 @@ export default function Navigation({
         <div className="flex justify-between h-20">
           {/* Logo & Academy Name */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNavClick("home")}>
-            <div className="w-10 h-10 bg-natural-green dark:bg-natural-green rounded-lg flex items-center justify-center text-natural-gold font-bold text-xl shadow-md border border-emerald-800 shrink-0">
-              AQ
-            </div>
+            <img
+              src="/logo.png"
+              alt="Abu Qoonitah Islamic Academy Logo"
+              className="w-12 h-12 rounded-lg shadow-sm border border-emerald-800/40 shrink-0 object-cover"
+              referrerPolicy="no-referrer"
+            />
             <div>
               <span className="block text-lg font-bold text-natural-green dark:text-amber-100 font-sans leading-none tracking-tight uppercase">
                 Abu Qoonitah
@@ -289,7 +292,25 @@ export default function Navigation({
 
       {/* Mobile Drawer */}
       {isOpen && (
-        <div className="lg:hidden bg-white dark:bg-emerald-950 border-t border-emerald-100 dark:border-emerald-900 px-4 pt-2 pb-6 space-y-1">
+        <div className="lg:hidden bg-white dark:bg-emerald-950 border-t border-emerald-100 dark:border-emerald-900 px-4 pt-4 pb-6 space-y-1">
+          {/* Centered Mobile Logo */}
+          <div className="flex flex-col items-center justify-center pb-4 border-b border-emerald-50 dark:border-emerald-900/40">
+            <img
+              src="/logo.png"
+              alt="Abu Qoonitah Islamic Academy Logo"
+              className="w-16 h-16 rounded-xl shadow-md object-cover"
+              referrerPolicy="no-referrer"
+            />
+            <div className="text-center mt-2">
+              <span className="block text-sm font-bold text-natural-green dark:text-amber-100 uppercase tracking-wide">
+                Abu Qoonitah
+              </span>
+              <span className="block text-[9px] text-slate-400 dark:text-natural-gold uppercase tracking-widest mt-0.5">
+                Islamic Academy
+              </span>
+            </div>
+          </div>
+
           {/* Mobile Search */}
           <div className="relative mb-3 py-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
