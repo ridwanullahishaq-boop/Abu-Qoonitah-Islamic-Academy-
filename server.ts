@@ -1129,6 +1129,48 @@ app.post("/api/auth/login", (req, res) => {
   res.json({ token, user: safeUser });
 });
 
+app.post("/api/auth/forgot-password", (req, res) => {
+  const { identifier, whatsapp } = req.body;
+  if (!identifier) {
+    res.status(400).json({ error: "Username, Email, or WhatsApp is required." });
+    return;
+  }
+
+  const searchVal = identifier.toLowerCase().trim();
+  const userRecord = Object.values(db.users).find(u => {
+    return (
+      u.username.toLowerCase() === searchVal ||
+      (u.email && u.email.toLowerCase() === searchVal) ||
+      (u.whatsapp && u.whatsapp.replace(/\D/g, "") === searchVal.replace(/\D/g, ""))
+    );
+  });
+
+  if (!userRecord) {
+    res.status(404).json({ error: "No registered account found matching that Username, Email, or WhatsApp." });
+    return;
+  }
+
+  // Update whatsapp if provided
+  if (whatsapp && !userRecord.whatsapp) {
+    userRecord.whatsapp = whatsapp;
+    saveDatabase();
+  }
+
+  const plainPassword = userRecord.plainPassword || "Contact administrator";
+  const username = userRecord.username;
+
+  res.json({
+    success: true,
+    user: {
+      name: userRecord.name,
+      username: username,
+      plainPassword: plainPassword,
+      whatsapp: whatsapp || userRecord.whatsapp || "",
+      role: userRecord.role
+    }
+  });
+});
+
 app.post("/api/auth/register", (req, res) => {
   const { username, password, name, email, level, whyJoin, dob, country, state, paymentMode, receiptUrl, whatsapp } = req.body;
   if (!username || !password || !name || !email) {

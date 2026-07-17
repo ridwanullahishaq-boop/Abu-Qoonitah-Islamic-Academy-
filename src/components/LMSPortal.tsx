@@ -50,6 +50,10 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   // Forgot password mockup
   const [forgotEmail, setForgotEmail] = useState("");
   const [showForgot, setShowForgot] = useState(false);
+  const [forgotIdentifier, setForgotIdentifier] = useState("");
+  const [forgotWhatsapp, setForgotWhatsapp] = useState("");
+  const [forgotResult, setForgotResult] = useState<any>(null);
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   // --- LMS Dashboard states ---
   const [courses, setCourses] = useState<Course[]>([]);
@@ -761,11 +765,59 @@ Please verify my payment receipt and activate my admission. Jazakum Allahu Khair
 
   const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (forgotEmail.trim()) {
-      setSuccessMsg(`As-salamu alaykum. Password reset link dispatched to ${forgotEmail}. Please check your spam folder.`);
-      setForgotEmail("");
-      setShowForgot(false);
+    if (!forgotIdentifier.trim()) {
+      setAuthError("Please enter your Username, Email, or WhatsApp.");
+      return;
     }
+    
+    setForgotLoading(true);
+    setAuthError("");
+    setSuccessMsg("");
+    setForgotResult(null);
+
+    fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier: forgotIdentifier, whatsapp: forgotWhatsapp })
+    })
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(err => { throw new Error(err.error || "Failed to lookup account"); });
+        }
+        return res.json();
+      })
+      .then(data => {
+        setForgotResult(data.user);
+        setForgotWhatsapp(data.user.whatsapp || "");
+        setSuccessMsg(`Account located successfully for ${data.user.name}.`);
+      })
+      .catch(err => {
+        setAuthError(err.message);
+      })
+      .finally(() => {
+        setForgotLoading(false);
+      });
+  };
+
+  const formatPhoneForWhatsApp = (phone: string) => {
+    let cleaned = phone.replace(/\D/g, "");
+    if (cleaned.startsWith("0") && cleaned.length === 11) {
+      cleaned = "234" + cleaned.substring(1);
+    }
+    return cleaned;
+  };
+
+  const getWhatsAppLink = (user: any, phone: string) => {
+    const cleanedPhone = formatPhoneForWhatsApp(phone);
+    const text = `As-salamu alaykum,
+
+Here are your login credentials for Abu Qoonitah Academy:
+👤 *Username:* ${user.username}
+🔑 *Password:* ${user.plainPassword}
+Role: ${user.role.toUpperCase()}
+
+Please keep this secure.`;
+    return `https://wa.me/${cleanedPhone}?text=${encodeURIComponent(text)}`;
   };
 
   const handleReceiptChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2659,33 +2711,143 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
         )}
 
         {showForgot ? (
-          /* Forgot Password mockup form */
-          <form onSubmit={handleForgotPassword} className="space-y-4">
-            <div className="space-y-1">
-              <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block">EMAIL ADDRESS</span>
-              <input
-                type="email"
-                placeholder="you@domain.com"
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-                required
-                className="w-full bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold rounded-lg text-xs"
-            >
-              Dispatch Reset Link
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowForgot(false); setAuthError(""); }}
-              className="w-full text-center text-xs text-emerald-650 hover:text-emerald-800"
-            >
-              Back to Login
-            </button>
-          </form>
+          <div className="space-y-4">
+            {!forgotResult ? (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] text-emerald-700 dark:text-amber-100 font-bold uppercase tracking-wider block">
+                    USERNAME, EMAIL, OR WHATSAPP
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Enter registered username, email or WhatsApp"
+                    value={forgotIdentifier}
+                    onChange={(e) => setForgotIdentifier(e.target.value)}
+                    required
+                    className="w-full bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-medium"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-emerald-950 font-bold rounded-lg text-xs cursor-pointer transition-colors"
+                >
+                  {forgotLoading ? "Locating Account..." : "Locate My Account"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgot(false);
+                    setAuthError("");
+                    setSuccessMsg("");
+                    setForgotIdentifier("");
+                    setForgotResult(null);
+                  }}
+                  className="w-full text-center text-xs text-emerald-650 dark:text-amber-150 hover:text-emerald-800 font-semibold"
+                >
+                  Back to Login
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-4 text-left">
+                <div className="p-3.5 bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-150 rounded-xl space-y-3">
+                  <div className="border-b border-emerald-100 pb-2">
+                    <span className="text-[10px] text-slate-400 block uppercase tracking-wider">Account Found</span>
+                    <h4 className="font-bold text-sm text-emerald-950 dark:text-white">{forgotResult.name}</h4>
+                    <span className="inline-block mt-0.5 px-2 py-0.5 bg-amber-500/10 text-amber-650 border border-amber-500/20 rounded text-[9px] font-bold uppercase">
+                      {forgotResult.role}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 font-sans">
+                    <div className="flex justify-between items-center bg-white dark:bg-emerald-900/10 p-2 rounded border border-emerald-100/30">
+                      <div>
+                        <span className="text-[9px] text-slate-400 block">USERNAME</span>
+                        <code className="text-xs font-bold text-emerald-950 dark:text-white font-mono">{forgotResult.username}</code>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(forgotResult.username);
+                          alert("Username copied to clipboard!");
+                        }}
+                        className="text-[10px] text-amber-600 font-semibold hover:underline"
+                      >
+                        Copy
+                      </button>
+                    </div>
+
+                    <div className="flex justify-between items-center bg-white dark:bg-emerald-900/10 p-2 rounded border border-emerald-100/30">
+                      <div>
+                        <span className="text-[9px] text-slate-400 block">PASSWORD</span>
+                        <code className="text-xs font-bold text-emerald-950 dark:text-white font-mono">{forgotResult.plainPassword}</code>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(forgotResult.plainPassword);
+                          alert("Password copied to clipboard!");
+                        }}
+                        className="text-[10px] text-amber-600 font-semibold hover:underline"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[10px] text-emerald-700 dark:text-amber-100 font-bold uppercase tracking-wider block">
+                    YOUR WHATSAPP NUMBER
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="e.g., 2348012345678"
+                    value={forgotWhatsapp}
+                    onChange={(e) => setForgotWhatsapp(e.target.value)}
+                    className="w-full bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-mono"
+                  />
+                  <p className="text-[9px] text-slate-400 leading-relaxed font-sans">
+                    Enter WhatsApp number with country code (e.g. 234 for Nigeria, or 080... format will auto-convert).
+                  </p>
+                </div>
+
+                <a
+                  href={getWhatsAppLink(forgotResult, forgotWhatsapp)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors text-center shadow-xs cursor-pointer"
+                >
+                  <span>📩 Send to WhatsApp</span>
+                </a>
+
+                <div className="flex gap-2.5 pt-1 font-sans">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotResult(null);
+                      setSuccessMsg("");
+                      setAuthError("");
+                    }}
+                    className="flex-1 py-2 border border-slate-200 hover:bg-slate-50 dark:hover:bg-emerald-950/20 text-slate-500 rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgot(false);
+                      setAuthError("");
+                      setSuccessMsg("");
+                      setForgotIdentifier("");
+                      setForgotResult(null);
+                    }}
+                    className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold rounded-lg text-xs cursor-pointer transition-colors"
+                  >
+                    Go to Login
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         ) : isRegistering ? (
           /* Student Admissions / Registration Form */
           <form onSubmit={handleRegister} className="space-y-4">
