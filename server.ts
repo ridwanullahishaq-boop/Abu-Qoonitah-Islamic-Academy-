@@ -2510,261 +2510,251 @@ import { GoogleGenAI } from "@google/genai";
 
 function findLocalIslamicAcademyAnswer(msg: string): string | null {
   const query = msg.toLowerCase().trim();
+  const cleaned = query.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "").replace(/\s+/g, " ");
 
-  // 1. Student register / Portal / Access / Log in
-  if (
-    query.includes("student portal") ||
-    query.includes("register") ||
-    query.includes("enroll") ||
-    query.includes("log in") ||
-    query.includes("بوابة") ||
-    query.includes("تسجيل") ||
-    query.includes("الولوج") ||
-    query.includes("دخول")
-  ) {
-    if (query.includes("واجب") || query.includes("worksheet") || query.includes("recitation") || query.includes("تلاو") || query.includes("صوت")) {
-      // Fall through to worksheet section
+  // Identify Islamic Greetings
+  const hasIslamicGreeting = 
+    cleaned.includes("as salaamu alaikum") || 
+    cleaned.includes("as-salaamu alaikum") || 
+    cleaned.includes("assalamu alaikum") || 
+    cleaned.includes("as salaam alaikum") || 
+    cleaned.includes("salam alaikum") || 
+    cleaned.includes("salaam alaikum") ||
+    cleaned.includes("السلام عليكم") ||
+    cleaned.includes("سلام") ||
+    cleaned.includes("alhamdulillah") ||
+    cleaned.includes("الحمد لله");
+
+  const isOnlyGreeting = 
+    cleaned === "as salaamu alaikum" || 
+    cleaned === "as-salaamu alaikum" || 
+    cleaned === "assalamu alaikum" || 
+    cleaned === "as salaam alaikum" || 
+    cleaned === "salam alaikum" || 
+    cleaned === "salaam alaikum" ||
+    cleaned === "as salaamu alaikum wa rahmatullahi wa barakaatuh" ||
+    cleaned === "assalamu alaikum wa rahmatullahi wa barakaatuh" ||
+    cleaned === "as-salaamu alaikum wa rahmatullahi wa barakaatuh" ||
+    cleaned === "salam" ||
+    cleaned === "salaam" ||
+    cleaned === "السلام عليكم" ||
+    cleaned === "السلام عليكم ورحمة الله وبركاته" ||
+    cleaned === "سلام عليكم";
+
+  let greetingPrefix = "";
+  if (hasIslamicGreeting) {
+    if (query.includes("السلام") || query.includes("سلام")) {
+      greetingPrefix = "Wa alaikumus salaam wa rahmatullahi wa barakaatuh.\n\n";
     } else {
-      return `As-salamu alaykum! 
-Here is how to register and access your Student Portal:
-1. Click the **"Portal Access" (or "بوابة الدخول")** button at the top-right corner of the website's navigation bar.
-2. Under the **Student Portal** tab, click **"Register"** to create a brand new account, or type your credentials if you are already registered.
-3. Once logged in, your Student Dashboard will display all your active and enrolled courses (e.g., Al-Ajurrumiyyah, Tajweed, Aqeedah).
-4. Within each course page, you can review lesson materials, view course announcements, and complete homework tasks!`;
+      greetingPrefix = "Wa alaikumus salaam wa rahmatullahi wa barakaatuh.\n\n";
     }
   }
 
-  // 2. Worksheets / Submitting / Recitation / Audio
-  if (
-    query.includes("worksheet") ||
-    query.includes("submit") ||
-    query.includes("homework") ||
-    query.includes("recitation") ||
-    query.includes("audio") ||
-    query.includes("file") ||
-    query.includes("واجب") ||
-    query.includes("تلاو") ||
-    query.includes("تسليم") ||
-    query.includes("صوت")
-  ) {
-    return `As-salamu alaykum! 
-Submitting assignments and recording audio recitations is built directly into our Student Portal:
-1. Log in to your **Student Portal** (via "Portal Access" on top).
-2. Open your active course and scroll down to the **"Worksheets"** section.
-3. You can:
-   - Type your answers directly into the online text area.
-   - Upload homework files, images, or documents (we support fast high-performance file uploads up to 150MB!).
-   - **Record your voice recitation live**: Click the microphone icon to record your Quran recitation or Tajweed practice directly using your device's mic, listen to it, and submit!
-4. Click **"Submit Homework"**. Your teacher will instantly receive it to listen, review, and leave a grade and audio/text feedback!`;
+  // If it's ONLY an Islamic greeting, return the exact required response
+  if (isOnlyGreeting) {
+    return "Wa alaikumus salaam wa rahmatullahi wa barakaatuh. How may I help you today?";
   }
 
-  // 3. Free courses / Laamiyyatu / Poetry / Audio
-  if (
-    query.includes("free course") ||
-    query.includes("laamiy") ||
-    query.includes("poem") ||
-    query.includes("poetry") ||
-    query.includes("لامي") ||
-    query.includes("شعر") ||
-    query.includes("ديوان") ||
-    query.includes("مجاني")
-  ) {
-    return `As-salamu alaykum! 
-Our Academy features a dedicated Library and Free Courses system:
-1. Click on the **"Free Courses"** or **"Poetry Library"** tabs in the main navigation menu.
-2. Here, you will find beautiful classical texts such as Ibn Taymiyyah's **"Laamiyyatu" (قصيدة اللامية)**.
-3. You can click the **"Play Audio"** button to listen to clear, beautifully mastered vocal recitations of these classical poems.
-4. You can also view the full Arabic text directly on your screen or download the entire curriculum books as PDF documents.`;
+  // Handle general English greetings
+  if (cleaned === "hello" || cleaned === "hi" || cleaned === "good morning" || cleaned === "good afternoon" || cleaned === "good evening") {
+    return `As-salamu alaykum! Hello and welcome to Abu Qoonitah Islamic Academy. How may I assist you with your studies or enrollment today?`;
   }
 
-  // 4. Teacher management / Course / Grade
+  // 1. Tuition Fees & School Fees
   if (
-    query.includes("teacher") ||
-    query.includes("manage") ||
-    query.includes("grade") ||
-    query.includes("upload") ||
-    query.includes("درس") ||
-    query.includes("إدارة") ||
-    query.includes("معلم") ||
-    query.includes("أستاذ") ||
-    query.includes("درجات")
+    query.includes("tuition") ||
+    query.includes("school fee") ||
+    query.includes("school fees") ||
+    query.includes("need to pay") ||
+    query.includes("what is the fee") ||
+    query.includes("what are the fees") ||
+    query.includes("how much is") && (query.includes("fee") || query.includes("fees") || query.includes("cost") || query.includes("pay")) ||
+    query.includes("course cost") ||
+    query.includes("semester fee") ||
+    query.includes("how much do i pay") ||
+    query.includes("رسوم") ||
+    query.includes("كم الرسوم") ||
+    query.includes("كم ادفع") ||
+    query.includes("كم تكلفة") ||
+    query.includes("سعر")
   ) {
-    return `As-salamu alaykum! 
-Teachers have robust, professional management panels on our platform:
-1. Click **"Portal Access"** in the top-right menu and log in using your Teacher credentials.
-2. From your Teacher Dashboard, you can:
-   - **Create and edit courses**: Set up curricula, syllabus texts, and upload course reference books (PDF files up to 150MB).
-   - **Grade Student Recitations**: Listen to audio recordings submitted by students, view their uploaded files/homework, and input grades with custom text feedback.
-   - **Sermon TV & Notices**: Add video broadcasts to the Academy's live stream and post news.`;
+    const isAr = query.includes("رسوم") || query.includes("كم") || query.includes("ادفع") || query.includes("تكلفة") || query.includes("سعر");
+    if (isAr) {
+      return `${greetingPrefix}الرسوم الدراسية المعتمدة في أكاديمية أبو قانتة الإسلامية هي كالتالي:
+• **الرسوم الشهرية**: ٥,٠٠٠ نيرة نيجيرية (5,000 NGN).
+• **رسوم الفصل الدراسي الواحد (الترم)**: ١٥,٠٠٠ نيرة نيجيرية (15,000 NGN).
+
+إذا كنت مهتمًا بمستوى أو دورة معينة، يرجى إخباري بذلك حتى أتمكن من توفير كامل التفاصيل والجدول الدراسي. يمكنك تسليم إيصالات الدفع مباشرة عبر بوابة الطالب!`;
+    }
+
+    return `${greetingPrefix}The official tuition fees for Abu Qoonitah Islamic Academy are as follows:
+- **Monthly Tuition Payment**: ₦5,000 NGN per month.
+- **Semester Tuition Fee**: ₦15,000 NGN per semester.
+
+If you tell me the specific course or level you are interested in (e.g. Beginner Spelling, Intermediate Zad Academic Class), I can provide the exact fee and programme details. You can submit bank transfer receipts under the Payments tab inside your Student Portal to activate locked courses!`;
   }
 
-  // 5. Calendar / Event / Schedule
+  // 2. Courses & Levels Offered
   if (
-    query.includes("calendar") ||
-    query.includes("event") ||
-    query.includes("date") ||
+    query.includes("what courses") ||
+    query.includes("which courses") ||
+    query.includes("courses do you offer") ||
+    query.includes("course offer") ||
+    query.includes("list of courses") ||
+    query.includes("ما هي المقررات") ||
+    query.includes("ما هي الدورات") ||
+    query.includes("الدورات المتاحة") ||
+    query.includes("المقررات") ||
+    query.includes("الدورات")
+  ) {
+    const isAr = query.includes("ما هي") || query.includes("دورات") || query.includes("مقررات") || query.includes("المتاح");
+    if (isAr) {
+      return `${greetingPrefix}تقدم أكاديمية أبو قانتة الإسلامية المقررات والمستويات المنهجية التالية:
+
+١. **مرحلة المبتدئين (Foundation Track)**:
+   - **المستوى الأول**: التهجئة والقراءة الصحيحة (القاعدة النورانية/البغدادية).
+   - **المستوى الثاني**: حفظ جزء عم، ١٠٠ حديث شريف، الفقه العقدي، ومبادئ التوحيد.
+   - **المستوى الثالث**: حفظ جزء تبارك، الأربعين النووية، متن الأخضري في الفقه المالكي، وثلاثة الأصول.
+
+٢. **المرحلة المتوسطة (كتاب زاد المستقنع والأكاديمي)**:
+   - **المستوى الأول (الفصل الأول والثاني)**: الفقه، التوحيد، الحديث، اللغة العربية (النحو والصرف)، والسيرة النبوية.
+   - **المستوى الثاني (الفصل الأول والثاني)**: دراسات متعمقة في الفقه، التوحيد، الحديث، العربية، والسيرة النبوية.
+
+يسعدنا تسجيلك في أي من هذه المستويات من خلال بوابتك الأكاديمية!`;
+    }
+
+    return `${greetingPrefix}Abu Qoonitah Islamic Academy offers the following verified academic courses and tracks:
+
+1. **Beginner Class (Foundation Track)**:
+   - **Level 1**: Spelling and Reading Class (building correct Arabic pronunciation).
+   - **Level 2**: Quran (Juz Ammah), 100 Hadiths, Fiqh, and Tawheed basics.
+   - **Level 3**: Quran (Juz Tabaarak), 40 Hadiths (Arba'een An-Nawawiyyah), Matn Al-Akhdori in Fiqh, and Thalaathatul Usool (The Three Fundamental Principles).
+
+2. **Intermediate Class (Zad Academic & Classical Books)**:
+   - **Level 1 (First & Second Semesters)**: Fiqh (Jurisprudence), Monotheism (Tawheed), Hadith, Arabiyyah (Grammar/Syntax), and Seerah (Prophetic Biography).
+   - **Level 2 (First & Second Semesters)**: Advanced modules in Fiqh, Tawheed, Hadith, Arabiyyah, and Seerah.
+
+All study programs are fully supervised with direct monitoring and worksheet/audio grading. Let me know which level you wish to enroll in!`;
+  }
+
+  // 3. Registering / How to register
+  if (
+    query.includes("how to register") ||
+    query.includes("want to register") ||
+    query.includes("register account") ||
+    query.includes("how do i register") ||
+    query.includes("registration process") ||
+    query.includes("كيفية التسجيل") ||
+    query.includes("اريد التسجيل") ||
+    query.includes("كيف اسجل") ||
+    query.includes("طريقة التسجيل")
+  ) {
+    const isAr = query.includes("تسجيل") || query.includes("كيف") || query.includes("اريد");
+    if (isAr) {
+      return `${greetingPrefix}إليك طريقة التسجيل في الأكاديمية خطوة بخطوة:
+١. اضغط على زر **"Portal Access" (بوابة الدخول)** في أعلى يمين شريط التنقل بالموقع.
+٢. في بويب **"Student Portal" (بوابة الطالب)**، اختر خيار **"Register"** لإنشاء حساب جديد.
+٣. قم بتعبئة البيانات المطلوبة (الاسم الكامل، اسم المستخدم، البريد الإلكتروني، وكلمة المرور).
+٤. بعد تسجيل الحساب، ستتمكن من الدخول مباشرة إلى بوابتك الأكاديمية، استعراض المناهج، حل الواجبات، ومتابعة درجاتك وتسميعك الصوتي!`;
+    }
+
+    return `${greetingPrefix}Here is the step-by-step process to register an account at Abu Qoonitah Islamic Academy:
+1. Click on the **"Portal Access"** button located at the top-right corner of the navigation bar.
+2. Under the **Student Portal** tab, click on **"Register"** to set up a new account.
+3. Input your Full Name, desired Username, Email address, and a secure Password.
+4. Once registered, you can log in instantly to view all courses, download study books, submit worksheets, and record audio recitations for teacher evaluation!`;
+  }
+
+  // 4. Class Schedule & Calender
+  if (
     query.includes("schedule") ||
+    query.includes("calendar") ||
+    query.includes("when are the classes") ||
+    query.includes("class times") ||
     query.includes("تقويم") ||
-    query.includes("حدث") ||
-    query.includes("مواعيد") ||
-    query.includes("جدول")
+    query.includes("جدول") ||
+    query.includes("مواعيد")
   ) {
-    return `As-salamu alaykum! 
-Our interactive School Calendar keeps the entire Madrasah coordinated:
-1. Visitors can view all scheduled events by opening the calendar widget.
-2. Teachers and administrators can add new calendar events (such as live webinars, classes, or public Islamic lectures) by logging into their Teacher Portal.
-3. Any added event instantly updates on the public schedule for everyone!`;
+    const isAr = query.includes("تقويم") || query.includes("جدول") || query.includes("مواعيد");
+    if (isAr) {
+      return `${greetingPrefix}الجدول الدراسي لدينا مرن ويتم تحديثه أسبوعياً:
+- يمكنك مراجعة كافة المواعيد واللقاءات والمحاضرات المباشرة من خلال جدول التقويم التفاعلي المتواجد على الصفحة الرئيسية.
+- يمتلك المدرسون والمسؤولون إمكانية إضافة وتحديث الحلقات والمواعيد مباشرة من لوحة التحكم لتظهر لجميع الطلاب والزوار فوراً.`;
+    }
+
+    return `${greetingPrefix}Our class schedule is highly flexible and dynamically updated:
+- You can view all active and upcoming classes, live webinars, and public lectures via the interactive **Calendar** widget displayed on the platform.
+- Certified teachers update the schedule weekly directly from their panels so you always have the most up-to-date timings!`;
   }
 
-  // 6. About / Mission / Vision / Academy
+  // 5. Examinations, Assignments, and Certificates
   if (
-    query.includes("about") ||
-    query.includes("mission") ||
-    query.includes("vision") ||
-    query.includes("academy") ||
-    query.includes("منهج") ||
-    query.includes("رؤية") ||
-    query.includes("أكاديمية") ||
-    query.includes("من نحن")
+    query.includes("exam") ||
+    query.includes("quiz") ||
+    query.includes("test") ||
+    query.includes("assignment") ||
+    query.includes("worksheet") ||
+    query.includes("certificate") ||
+    query.includes("submit homework") ||
+    query.includes("اختبار") ||
+    query.includes("واجب") ||
+    query.includes("شهادة") ||
+    query.includes("تسميع")
   ) {
-    return `As-salamu alaykum! 
-**Abu Qoonitah Islamic Academy** is a premier online Madrasah focused on providing authentic and pure Islamic knowledge based strictly on the Quran and Sunnah according to the understanding of the righteous predecessors (Salaf-us-Salih).
-We offer professional, structured curriculums covering:
-- **Quranic Sciences**: Memorization (Hifdh) and precise rules of Tajweed.
-- **Arabic Language**: Classical Grammar (Nahw through Al-Ajurrumiyyah), Morphology (Sarf), and rhetoric.
-- **Creed & Jurisprudence**: Authentic Aqeedah (such as Al-Wasiyyah) and Islamic Fiqh tracks.`;
+    const isAr = query.includes("اختبار") || query.includes("واجب") || query.includes("شهادة") || query.includes("تسميع");
+    if (isAr) {
+      return `${greetingPrefix}نظام التقييم والشهادات في الأكاديمية متكامل وتلقائي:
+- **الواجبات والتسميع**: يمكنك حل أوراق العمل وإدخال الإجابات، أو رفع ملفات مذكرات (حتى ١٥٠ ميجابايت)، أو تسجيل صوتك مباشرة تلاوة للقرآن ليقوم المعلم بتقييمها ووضع الدرجات والملحوظات الصوتية لك.
+- **الاختبارات**: تعقد اختبارات دورية في نهاية الفصول الدراسية والمستويات لقياس تقدمك.
+- **الشهادات**: بمجرد إتمامك لكافة الاختبارات وأوراق العمل بنجاح، سيقوم النظام تلقائياً بإنشاء شهادة تخرج رسمية بصيغة PDF موثقة باسمك يمكنك تحميلها وطباعتها فوراً من بوابة الطالب!`;
+    }
+
+    return `${greetingPrefix}Abu Qoonitah Islamic Academy provides a rigorous, automated evaluation and certification system:
+- **Assignments & Worksheets**: In your Student Portal, you can type answers, upload homework documents or images (up to 150MB), or record your Quranic recitation/Tajweed voice live on the browser. Teachers listen to your audio files and input direct grades and feedback.
+- **Examinations**: Regular online quizzes and comprehensive exams are scheduled at the end of each course level.
+- **Certificates**: Upon passing all exams and worksheets, a personalized official Certificate of Graduation is instantly generated as a high-quality PDF, ready to download and print directly from your Student Dashboard!`;
   }
 
-  // 7. Library / Books / Download
-  if (
-    query.includes("library") ||
-    query.includes("books") ||
-    query.includes("download") ||
-    query.includes("مكتبة") ||
-    query.includes("كتب") ||
-    query.includes("تنزيل") ||
-    query.includes("تحميل")
-  ) {
-    return `As-salamu alaykum! 
-We host twin libraries to satisfy students and seekers of knowledge:
-1. **Islamic Library**: Houses classical source books of Tafsir, Hadith, Aqeedah, and Fiqh (e.g., Riyadh As-Saliheen).
-2. **Poetry Library**: Offers classical Arabic poems in clean typography with offline download buttons.
-3. You can search libraries using the instant search bar and download study materials directly to your device!`;
-  }
-
-  // 8. Donate / Support / Bank Transfer / Receipt
-  if (
-    query.includes("donate") ||
-    query.includes("support") ||
-    query.includes("money") ||
-    query.includes("payment") ||
-    query.includes("receipt") ||
-    query.includes("تبرع") ||
-    query.includes("دعم") ||
-    query.includes("صدقة") ||
-    query.includes("إيصال")
-  ) {
-    return `As-salamu alaykum! 
-Supporting Islamic education is a magnificent form of Sadaqah Jariyah. Here is how you can support the academy:
-1. Click the **"Donate Now"** tab in the navigation menu.
-2. Fill out your name, email, and the amount you wish to contribute.
-3. You can securely simulate a card payment, OR make a direct bank transfer and upload your receipt document/photo (up to 150MB) directly through the donation form to keep our educational materials free!`;
-  }
-
-  // 9. Contact / Whatsapp
+  // 6. Contact & Administration
   if (
     query.includes("contact") ||
     query.includes("whatsapp") ||
     query.includes("phone") ||
     query.includes("number") ||
+    query.includes("tutor") ||
+    query.includes("teacher") ||
     query.includes("تواصل") ||
     query.includes("واتس") ||
-    query.includes("رقم")
+    query.includes("رقم") ||
+    query.includes("مدرس") ||
+    query.includes("معلم")
   ) {
-    return `As-salamu alaykum! 
-You can communicate directly with Abu Qoonitah:
-- Click the floating green **WhatsApp icon** located at the bottom-right corner of any page.
-- Direct mobile number/WhatsApp: **08122455759**. We look forward to hearing from you!`;
+    const isAr = query.includes("تواصل") || query.includes("واتس") || query.includes("رقم") || query.includes("مدرس") || query.includes("معلم");
+    if (isAr) {
+      return `${greetingPrefix}يمكنك التواصل المباشر مع إدارة الأكاديمية وفضيلة الشيخ أبو قانتة:
+- عبر واتساب بالضغط على الأيقونة الخضراء العائمة في أسفل يمين الصفحة.
+- رقم الهاتف المباشر والواتساب: **08122455759**.`;
+    }
+
+    return `${greetingPrefix}You can communicate directly with the academy administration and our head tutor, Abu Qoonitah:
+- Click the floating green **WhatsApp button** in the bottom-right corner of any page.
+- Direct phone call or WhatsApp number: **08122455759**. We are happy to guide you!`;
   }
 
-  // 10. Weather / Solar / Salat / Prayer / Refraction / Hijrah / Time / Splat
+  // 7. General Fallback for non-academy specific details where we don't have accurate database entries
   if (
-    query.includes("weather") ||
-    query.includes("solar") ||
-    query.includes("salat") ||
-    query.includes("prayer") ||
-    query.includes("refraction") ||
-    query.includes("hijrah") ||
-    query.includes("hijri") ||
-    query.includes("time") ||
-    query.includes("splat") ||
-    query.includes("طقس") ||
-    query.includes("صلاة") ||
-    query.includes("هجري") ||
-    query.includes("وقت") ||
-    query.includes("شمس")
+    query.includes("hostel") ||
+    query.includes("dormitory") ||
+    query.includes("cafeteria") ||
+    query.includes("scholarship") ||
+    query.includes("degree") ||
+    query.includes("phd") ||
+    query.includes("masters") ||
+    query.includes("bachelors") ||
+    query.includes("discount") ||
+    query.includes("sponsorship")
   ) {
-    return `As-salamu alaykum! 
-Our platform features an interactive weather, solar time, and Salat tracking engine in the Footer:
-1. **Atmospheric Weather Selector**: Adjust weather conditions (Sunny, Cloudy, Rainy, Overcast) in the footer to simulate changes in atmospheric density refraction!
-2. **Apparent Solar Time**: Apparent solar time is calculated live using the sinusoidal Equation of Time (EOT) formula, shifting dynamically with the weather refraction index.
-3. **Splat (Salat) Prayer Times**: Adjusted automatically based on the Ibadan, Nigeria geographical coordinates (7.3775° N, 3.9470° E), modulated in real-time by your atmospheric weather settings.
-4. **Hijrah Date**: Generates a live, authentic Hijri calendar date in Arabic and English using the official Umm al-Qura standard.`;
-  }
-
-  // 11. Nahw vs Sarf
-  if (
-    query.includes("nahw") ||
-    query.includes("sarf") ||
-    query.includes("صرف") ||
-    query.includes("نحو") ||
-    query.includes("قواعد")
-  ) {
-    return `As-salamu alaykum! 
-Here is the core difference between Nahw and Sarf in the Arabic language:
-1. **Nahw (Arabic Grammar / النحو)**: Concerned with the endings of Arabic words inside sentences (e.g. Dammah, Fathah, Kasrah) and how their positions change meaning. It is studied via classical texts like *Al-Ajurrumiyyah*.
-2. **Sarf (Arabic Morphology / الصرف)**: Focuses on the internal structure, conjugation, and derivation of the words themselves (e.g., how the root verb *k-t-b* conjugate into *kataba*, *yaktubu*, *kitab*, *katib*, etc.).`;
-  }
-
-  // 12. Noon Sakinah
-  if (
-    query.includes("noon sakinah") ||
-    query.includes("tajweed") ||
-    query.includes("tanween") ||
-    query.includes("تجويد") ||
-    query.includes("نون") ||
-    query.includes("تنوي")
-  ) {
-    return `As-salamu alaykum! 
-The rules of Noon Sakinah and Tanween (Sakinah N and double vowels) in Tajweed are four fundamental practices:
-1. **Izhaar (الإظهار - Clarity)**: Pronouncing the Noon sound clearly without extra nasalization when followed by throat letters: \`ء , هـ , ع , ح , غ , خ\`
-2. **Idghaam (الإدغام - Merging)**: Merging the Noon into the following letter. Merged with ghunnah (nasal sound) for letters \`ي , ن , م , و\`, or without ghunnah for letters \`ل , ر\`.
-3. **Iqlaab (الإقلاب - Conversion)**: Changing the Noon sound into a soft "Meem" sound with ghunnah when followed by the letter \`ب\`.
-4. **Ikhfaa (الإخفاء - Concealment)**: Concealing the Noon sound with a light nasal tone when followed by any of the remaining 15 letters.`;
-  }
-
-  // 13. Pillars of Salah
-  if (
-    query.includes("pillar") ||
-    query.includes("salah") ||
-    query.includes("shuroot") ||
-    query.includes("صلو") ||
-    query.includes("ركع") ||
-    query.includes("أركان") ||
-    query.includes("شروط")
-  ) {
-    return `As-salamu alaykum! 
-There are 14 essential pillars (Arkaan) of Salah (Prayer) which must be completed for the prayer to be valid:
-1. Standing during obligatory prayers if physically able.
-2. The opening Takbeer (saying "Allahu Akbar").
-3. Reciting Surah Al-Fatihah in every unit (Rak'ah).
-4. Ruku (bowing) and rising back to standing.
-5. Sujood (prostrating on seven bones: forehead/nose, two hands, two knees, and the toes of both feet).
-6. Sitting upright between the two prostrations.
-7. Tranquility (Tuma'neenah) and calm in every single physical movement.
-8. The final Tashahhud and sitting for it.
-9. Saying prayers upon the Prophet (Sallallahu Alayhi Wa Sallam).
-10. The Tasleem (saying "As-salamu alaykum wa rahmatullah" to the right and left).`;
+    return "I do not currently have that specific information. Please contact the academy administration for the most accurate answer.";
   }
 
   return null;
@@ -2795,35 +2785,48 @@ app.post("/api/chat", async (req, res) => {
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const systemInstruction = `You are "Abu Qoonitah Academy AI Assistant", an educational bot for Abu Qoonitah Islamic Academy, an online Madrasah teaching authentic Islamic knowledge (Quran recitation, Tajweed, Arabic grammar Al-Ajurrumiyyah, Nahw, Sarf, Aqeedah, and Fiqh).
-    Your core duty is to teach students, teachers, and visitors/strangers how to navigate and use this website, as well as providing authentic, correct Islamic and academic answers.
+    const systemInstruction = `You are the official AI Assistant of Abu Qoonitah Islamic Academy.
+    Your primary responsibility is to understand every question carefully, read the complete message thoroughly, identify exactly what the user is asking, and provide the most accurate and relevant answer possible.
+
+    GENERAL BEHAVIOUR:
+    1. Always read and understand the user's complete question before answering. Do not answer based on only one word or part of the question.
+    2. If the user asks a question about Abu Qoonitah Islamic Academy, use the academy information available in these instructions to provide the correct answer.
+    3. Never ignore a question that you can answer. Always answer the exact question asked.
+    4. ACCURACY RULE: Never make up or invent academy information! If the answer does not exist or you do not have that specific information, say exactly:
+       "I do not currently have that specific information. Please contact the academy administration for the most accurate answer."
+    5. Always maintain a respectful, helpful, intelligent, and natural conversation.
+    6. Respond according to the user's language. If the user asks in English, answer in English. If the user asks in Arabic, answer in Arabic. If the user asks in Yoruba, answer in Yoruba where possible.
+
+    ISLAMIC GREETINGS RULES:
+    - If the user says: "As salaamu alaikum"
+      Reply: "Wa alaikumus salaam wa rahmatullahi wa barakaatuh."
+    - If the user says: "As salaamu alaikum wa rahmatullahi wa barakaatuh"
+      Reply: "Wa alaikumus salaam wa rahmatullahi wa barakaatuh."
+    - Do not simply repeat the user's greeting back to them.
+    - If the user says hello, hi, good morning, or another normal greeting, respond naturally and politely.
+
+    TUITION FEES INFORMATION:
+    - Monthly Tuition Payment: ₦5,000 NGN.
+    - Semester Tuition Fee: ₦15,000 NGN.
+    - If asked about fees ("How much is the tuition fee.", "How much is the school fee.", "How much do I need to pay.", "What is the fee.", "How much does the course cost.", "How much is the semester fee."), answer directly using the above information.
+    - If the user does not specify a course or level and there are multiple fees, explain both options and ask which course or level they are interested in.
+
+    ACADEMY COURSES & INFORMATION:
+    1. Beginner Class (Foundation Track):
+       - Level 1: Spelling and Reading Class (building correct Arabic pronunciation).
+       - Level 2: Quran (Juz Ammah), 100 Hadiths, Fiqh, and Tawheed basics.
+       - Level 3: Quran (Juz Tabaarak), 40 Hadiths, Matn Al-Akhdori in Fiqh, and Thalaathatul Usool.
+    2. Intermediate Class (Zad Academic & Classical Books):
+       - Level 1 (First & Second Semesters): Fiqh, Tawheed, Hadith, Arabiyyah, and Seerah.
+       - Level 2 (First & Second Semesters): Advanced modules in Fiqh, Tawheed, Hadith, Arabiyyah, and Seerah.
 
     WEBSITE USAGE MANUAL TO TEACH USERS:
-    
-    1. FOR STUDENTS:
-       - HOW TO ACCESS: Click "Portal Access" (or "بوابة الدخول") at the top right of the navigation bar. Under Student Portal, they can register a new account or log in.
-       - DASHBOARD FEATURES: Once logged in, students can see enrolled courses, review lessons, and view Course Announcements.
-       - SUBMITTING WORKSHEETS: On a course page, students can access worksheets. They can type answers, upload worksheet documents or photos (up to 150MB), or record their voice/recitation live on the browser to submit!
-       - FREE COURSES: Accessible via the "Free Courses" tab in the navbar. They can learn classical poems like Ibn Taymiyyah's Laamiyyatu with real audio recitations.
+    - STUDENTS: Access via "Portal Access" (or "بوابة الدخول") at top-right. Register or log in under Student Portal. Submit worksheets by typing answers, uploading files (up to 150MB), or recording audio recitation live. Learn classical poems under "Free Courses".
+    - TEACHERS: Access via "Portal Access". Create and edit courses, grade worksheet text/files and audio recitations, schedule school calendar dates, post notices, and upload Sermon TV video streams.
+    - VISITORS / STRANGERS: Browse "About Us", use libraries, donate via card simulation or direct bank transfer receipt upload to keep education free, or click green WhatsApp icon to chat with Abu Qoonitah directly (WhatsApp: 08122455759).
+    - WEATHER & SOLAR FEATURE: Footer contains weather settings which modulate Salat (prayer) times and Apparent Solar Time based on atmospheric refraction. Displays Hijri date.
 
-    2. FOR TEACHERS:
-       - HOW TO ACCESS: Click "Portal Access" at the top right and enter teacher credentials.
-       - MANAGEMENT: Teachers can create courses, manage syllabus PDFs (up to 150MB), schedule school calendar dates/lectures, publish news, and upload videos to the Sermon TV stream.
-       - GRADING WORKSHEETS: Teachers can review students' worksheet submissions, view their uploaded files/images, listen to student-recorded recitation audios, and input grades and custom text feedback.
-
-    3. FOR VISITORS / STRANGERS:
-       - ABOUT US: Learn the Madrasah's mission under "About Us" and "Vision & Goals" tabs.
-       - LIBRARIES: Browse and search classical Islamic works under "Islamic Library" or Arabic classical verses under "Poetry Library". All items can be downloaded.
-       - VIDEOS: Stream lectures and video broadcasts in "Sermon TV".
-       - DONATING: Click "Donate Now" to support the Madrasah. Visitors can input card information or upload a bank transfer receipt file to support free education.
-       - CONTACT: Click the green floating WhatsApp button at the bottom right to chat with Abu Qoonitah directly on WhatsApp (number: 08122455759).
-
-    4. WEATHER & SOLAR TIME FEATURE:
-       - In the Footer, users can select weather conditions (Sunny, Cloudy, Rainy, Overcast) which dynamically changes the atmospheric refraction.
-       - This refraction index automatically adjusts Salat (Splat) times and live Apparent Solar Time in real-time.
-       - The footer also displays a dynamic Hijrah (Hijri) date calculated from Umm al-Qura standard calendars.
-
-    Your tone must be exceptionally welcoming, respectful, and encouraging. Greet users with "As-salamu alaykum" when starting. Keep your answers clear, beautifully structured, and highly precise.`;
+    Your tone must be exceptionally welcoming, respectful, and encouraging. Greet users properly. Keep answers clear, beautifully structured, and highly precise.`;
 
     const chatHistory = (history || []).map((h: any) => ({
       role: h.role === "user" ? "user" : "model",
