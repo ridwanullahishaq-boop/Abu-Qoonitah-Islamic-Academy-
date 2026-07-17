@@ -108,6 +108,23 @@ export default function Library({ isArabic, activeSection: initialSection }: Lib
     }
   };
 
+  const triggerPoemDownload = (poem: any) => {
+    if (poem.pdfUrl && poem.pdfUrl !== "#") {
+      const link = document.createElement("a");
+      link.href = poem.pdfUrl;
+      link.download = `${poem.title.replace(/[\s\W]+/g, "_")}.pdf`;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert(isArabic 
+        ? `عذراً، لا يوجد ملف PDF مرفق بهذه القصيدة حالياً.` 
+        : `Sorry, there is no PDF file attached to this poem currently.`
+      );
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-12 animate-fade-in">
       
@@ -279,13 +296,25 @@ export default function Library({ isArabic, activeSection: initialSection }: Lib
               >
                 {/* Poet Biography & Audio simulation panel */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-emerald-50 dark:border-emerald-800 pb-4 gap-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-natural-green dark:text-amber-100 font-serif">
-                      {poem.title}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-natural-gold dark:text-amber-400 font-medium">
-                      <User className="w-4 h-4 text-natural-green" />
-                      <span>{isArabic ? "الشاعر:" : "Poet:"} {poem.poetName}</span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    {poem.coverUrl && (
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden bg-emerald-950 flex-shrink-0 border border-emerald-100 dark:border-emerald-800 shadow-sm">
+                        <img
+                          referrerPolicy="no-referrer"
+                          src={poem.coverUrl}
+                          alt={poem.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="text-xl font-bold text-natural-green dark:text-amber-100 font-serif">
+                        {poem.title}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-natural-gold dark:text-amber-400 font-medium">
+                        <User className="w-4 h-4 text-natural-green" />
+                        <span>{isArabic ? "الشاعر:" : "Poet:"} {poem.poetName}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -322,6 +351,15 @@ export default function Library({ isArabic, activeSection: initialSection }: Lib
                     >
                       <Bookmark className={`w-4.5 h-4.5 ${bookmarks[poem.id] ? "fill-natural-gold text-natural-gold" : ""}`} />
                     </button>
+                    {poem.pdfUrl && (
+                      <button
+                        onClick={() => triggerPoemDownload(poem)}
+                        title={isArabic ? "تحميل متن القصيدة PDF" : "Download Mutn PDF"}
+                        className="text-natural-green hover:text-natural-gold dark:text-emerald-300 dark:hover:text-amber-300 p-1 transition-colors"
+                      >
+                        <Download className="w-4.5 h-4.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 

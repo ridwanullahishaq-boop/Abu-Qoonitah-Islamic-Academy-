@@ -132,6 +132,8 @@ export interface Poem {
   arabicText: string[];
   translationText: string[];
   audioUrl: string;
+  pdfUrl?: string;
+  coverUrl?: string;
   isBookmarked?: boolean;
 }
 

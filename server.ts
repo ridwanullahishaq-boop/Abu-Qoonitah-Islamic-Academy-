@@ -1138,7 +1138,7 @@ app.put("/api/admin/poems/:id", authenticate, (req, res) => {
     res.status(403).json({ error: "Access denied." });
     return;
   }
-  const { title, poetName, biography, category, arabicText, translationText } = req.body;
+  const { title, poetName, biography, category, arabicText, translationText, pdfUrl, coverUrl } = req.body;
   const poemIndex = db.poems.findIndex(p => p.id === req.params.id);
   if (poemIndex === -1) {
     res.status(404).json({ error: "Poem not found." });
@@ -1152,7 +1152,9 @@ app.put("/api/admin/poems/:id", authenticate, (req, res) => {
     biography,
     category,
     arabicText: arabicText || [],
-    translationText: translationText || []
+    translationText: translationText || [],
+    pdfUrl: pdfUrl || "",
+    coverUrl: coverUrl || ""
   };
   
   saveDatabase();
@@ -2205,7 +2207,7 @@ app.post("/api/admin/books/add", authenticate, (req, res) => {
 app.post("/api/admin/poems/add", authenticate, (req, res) => {
   const userId = (req as any).userId;
   const user = db.users[userId];
-  const { title, poetName, biography, category, arabicText, translationText } = req.body;
+  const { title, poetName, biography, category, arabicText, translationText, pdfUrl, coverUrl } = req.body;
 
   if (!user || user.role !== "admin") {
     res.status(403).json({ error: "Access denied." });
@@ -2220,7 +2222,9 @@ app.post("/api/admin/poems/add", authenticate, (req, res) => {
     category,
     arabicText: arabicText || [],
     translationText: translationText || [],
-    audioUrl: ""
+    audioUrl: "",
+    pdfUrl: pdfUrl || "",
+    coverUrl: coverUrl || ""
   };
 
   db.poems.push(newPoem);

@@ -366,6 +366,8 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [newPoemCategory, setNewPoemCategory] = useState("Aqeedah");
   const [newPoemArabicText, setNewPoemArabicText] = useState("");
   const [newPoemTranslationText, setNewPoemTranslationText] = useState("");
+  const [newPoemPdfUrl, setNewPoemPdfUrl] = useState("");
+  const [newPoemCoverUrl, setNewPoemCoverUrl] = useState("");
   const [libSaving, setLibSaving] = useState(false);
   const [libMessage, setLibMessage] = useState("");
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
@@ -1788,6 +1790,51 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     reader.readAsDataURL(file);
   };
 
+  const handleBookCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("⚠️ Warning: This image is quite large. Consider uploading a smaller image under 5MB.");
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewBookCoverUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePoemPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert("⚠️ Warning: This PDF is quite large (" + Math.round(file.size / 1024 / 1024) + "MB). It might cause upload issues. Consider using an external download link for larger documents.");
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewPoemPdfUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePoemCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("⚠️ Warning: This image is quite large. Consider uploading a smaller image under 5MB.");
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewPoemCoverUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const startSermonRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -2326,7 +2373,9 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
       biography: newPoemBio,
       category: newPoemCategory,
       arabicText: newPoemArabicText.split("\n").filter(line => line.trim()),
-      translationText: newPoemTranslationText.split("\n").filter(line => line.trim())
+      translationText: newPoemTranslationText.split("\n").filter(line => line.trim()),
+      pdfUrl: newPoemPdfUrl,
+      coverUrl: newPoemCoverUrl
     };
 
     if (editingPoemId) {
@@ -2348,6 +2397,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
             setNewPoemBio("");
             setNewPoemArabicText("");
             setNewPoemTranslationText("");
+            setNewPoemPdfUrl("");
+            setNewPoemCoverUrl("");
             setEditingPoemId(null);
             setLibMessage("📜 Poem updated successfully!");
             setTimeout(() => setLibMessage(""), 4500);
@@ -2379,6 +2430,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
             setNewPoemBio("");
             setNewPoemArabicText("");
             setNewPoemTranslationText("");
+            setNewPoemPdfUrl("");
+            setNewPoemCoverUrl("");
             setLibMessage("📜 Poem added to library successfully!");
             setTimeout(() => setLibMessage(""), 4500);
           } else {
@@ -2401,6 +2454,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     setNewPoemCategory(poem.category || "Aqeedah");
     setNewPoemArabicText(poem.arabicText ? poem.arabicText.join("\n") : "");
     setNewPoemTranslationText(poem.translationText ? poem.translationText.join("\n") : "");
+    setNewPoemPdfUrl(poem.pdfUrl || "");
+    setNewPoemCoverUrl(poem.coverUrl || "");
     const element = document.getElementById("admin-poem-form");
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
@@ -2414,6 +2469,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     setNewPoemBio("");
     setNewPoemArabicText("");
     setNewPoemTranslationText("");
+    setNewPoemPdfUrl("");
+    setNewPoemCoverUrl("");
   };
 
   const handleDeleteLibraryPoem = (id: string) => {
@@ -9447,14 +9504,30 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               </select>
                             </div>
                             <div className="space-y-1">
-                              <span className="font-bold text-emerald-700 block">Cover Image URL (Optional)</span>
-                              <input
-                                type="text"
-                                placeholder="https://images.unsplash.com/..."
-                                value={newBookCoverUrl}
-                                onChange={(e) => setNewBookCoverUrl(e.target.value)}
-                                className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
-                              />
+                              <span className="font-bold text-emerald-700 block">Cover Image (Upload or Enter URL)</span>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="https://images.unsplash.com/... or uploaded file"
+                                  value={newBookCoverUrl}
+                                  onChange={(e) => setNewBookCoverUrl(e.target.value)}
+                                  className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                                />
+                                <label className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
+                                  Upload Cover
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleBookCoverUpload}
+                                    className="hidden"
+                                  />
+                                </label>
+                              </div>
+                              {newBookCoverUrl?.startsWith("data:") && (
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                                  ✓ Cover image loaded from device ({Math.round(newBookCoverUrl.length / 1024)} KB)
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -9468,17 +9541,15 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 onChange={(e) => setNewBookDownloadUrl(e.target.value)}
                                 className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
                               />
-                              <div className="relative shrink-0">
+                              <label className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
+                                Upload PDF
                                 <input
                                   type="file"
                                   accept="application/pdf"
                                   onChange={handleBookPdfUpload}
-                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                  className="hidden"
                                 />
-                                <button type="button" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif">
-                                  Upload PDF
-                                </button>
-                              </div>
+                              </label>
                             </div>
                             {newBookDownloadUrl?.startsWith("data:") && (
                               <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
@@ -9606,6 +9677,62 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 onChange={(e) => setNewPoemBio(e.target.value)}
                                 className="w-full bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
                               />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <span className="font-bold text-emerald-700 block">Poem Cover/Illustration (Upload or Enter URL)</span>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="https://images.unsplash.com/... or uploaded file"
+                                  value={newPoemCoverUrl}
+                                  onChange={(e) => setNewPoemCoverUrl(e.target.value)}
+                                  className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                                />
+                                <label className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
+                                  Upload Image
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handlePoemCoverUpload}
+                                    className="hidden"
+                                  />
+                                </label>
+                              </div>
+                              {newPoemCoverUrl?.startsWith("data:") && (
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                                  ✓ Cover image loaded from device ({Math.round(newPoemCoverUrl.length / 1024)} KB)
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-1">
+                              <span className="font-bold text-emerald-700 block">Poem PDF Document (Upload File or Enter URL)</span>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="https://example.com/poem.pdf or loaded from device..."
+                                  value={newPoemPdfUrl}
+                                  onChange={(e) => setNewPoemPdfUrl(e.target.value)}
+                                  className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
+                                />
+                                <label className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
+                                  Upload PDF
+                                  <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    onChange={handlePoemPdfUpload}
+                                    className="hidden"
+                                  />
+                                </label>
+                              </div>
+                              {newPoemPdfUrl?.startsWith("data:") && (
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                                  ✓ PDF file loaded from device ({Math.round(newPoemPdfUrl.length / 1024)} KB)
+                                </div>
+                              )}
                             </div>
                           </div>
 
