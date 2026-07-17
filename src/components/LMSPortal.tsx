@@ -1790,19 +1790,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     reader.readAsDataURL(file);
   };
 
-  const handleBookCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBookCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("⚠️ Warning: This image is quite large. Consider uploading a smaller image under 5MB.");
+    try {
+      const compressed = await compressImage(file);
+      setNewBookCoverUrl(compressed);
+    } catch (err) {
+      console.error("Error compressing book cover:", err);
     }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNewBookCoverUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handlePoemPdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1820,19 +1817,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     reader.readAsDataURL(file);
   };
 
-  const handlePoemCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePoemCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("⚠️ Warning: This image is quite large. Consider uploading a smaller image under 5MB.");
+    try {
+      const compressed = await compressImage(file);
+      setNewPoemCoverUrl(compressed);
+    } catch (err) {
+      console.error("Error compressing poem cover:", err);
     }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNewPoemCoverUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
   const startSermonRecording = async () => {
@@ -2241,7 +2235,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
   const handleAddLibraryBook = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBookTitle || !newBookAuthor) return;
+    if (!newBookTitle.trim() || !newBookAuthor.trim()) {
+      setLibMessage("⚠️ Title and Author are required fields to register a book!");
+      return;
+    }
     setLibSaving(true);
     setLibMessage("");
     const token = localStorage.getItem("token") || "";
@@ -2362,7 +2359,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
   const handleAddLibraryPoem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPoemTitle || !newPoemPoet) return;
+    if (!newPoemTitle.trim() || !newPoemPoet.trim()) {
+      setLibMessage("⚠️ Title and Poet Name are required fields to register a poem!");
+      return;
+    }
     setLibSaving(true);
     setLibMessage("");
     const token = localStorage.getItem("token") || "";
@@ -9513,15 +9513,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   onChange={(e) => setNewBookCoverUrl(e.target.value)}
                                   className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
                                 />
-                                <label className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
+                                <label htmlFor="book-cover-file-input" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
                                   Upload Cover
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleBookCoverUpload}
-                                    className="hidden"
-                                  />
                                 </label>
+                                <input
+                                  id="book-cover-file-input"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleBookCoverUpload}
+                                  className="hidden"
+                                />
                               </div>
                               {newBookCoverUrl?.startsWith("data:") && (
                                 <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
@@ -9541,15 +9542,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 onChange={(e) => setNewBookDownloadUrl(e.target.value)}
                                 className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
                               />
-                              <label className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
+                              <label htmlFor="book-pdf-file-input" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
                                 Upload PDF
-                                <input
-                                  type="file"
-                                  accept="application/pdf"
-                                  onChange={handleBookPdfUpload}
-                                  className="hidden"
-                                />
                               </label>
+                              <input
+                                id="book-pdf-file-input"
+                                type="file"
+                                accept="application/pdf"
+                                onChange={handleBookPdfUpload}
+                                className="hidden"
+                              />
                             </div>
                             {newBookDownloadUrl?.startsWith("data:") && (
                               <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
@@ -9572,9 +9574,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           <div className="flex gap-2">
                             <button
                               type="submit"
-                              className="flex-grow py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs cursor-pointer shadow"
+                              disabled={libSaving}
+                              className="flex-grow py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg text-xs cursor-pointer shadow flex items-center justify-center gap-1.5"
                             >
-                              {editingBookId ? "💾 Save Book Changes" : "➕ Add Book to Catalog"}
+                              {libSaving ? (
+                                <>
+                                  <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"></span>
+                                  <span>⏳ Saving & Synchronizing...</span>
+                                </>
+                              ) : (
+                                <span>{editingBookId ? "💾 Save Book Changes" : "➕ Add Book to Catalog"}</span>
+                              )}
                             </button>
                             {editingBookId && (
                               <button
@@ -9691,15 +9701,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   onChange={(e) => setNewPoemCoverUrl(e.target.value)}
                                   className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
                                 />
-                                <label className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
+                                <label htmlFor="poem-cover-file-input" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
                                   Upload Image
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handlePoemCoverUpload}
-                                    className="hidden"
-                                  />
                                 </label>
+                                <input
+                                  id="poem-cover-file-input"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handlePoemCoverUpload}
+                                  className="hidden"
+                                />
                               </div>
                               {newPoemCoverUrl?.startsWith("data:") && (
                                 <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
@@ -9718,15 +9729,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   onChange={(e) => setNewPoemPdfUrl(e.target.value)}
                                   className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"
                                 />
-                                <label className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
+                                <label htmlFor="poem-pdf-file-input" className="px-3 py-2 bg-emerald-750 hover:bg-emerald-800 text-white font-bold rounded text-xs cursor-pointer font-serif shrink-0 flex items-center justify-center text-center select-none">
                                   Upload PDF
-                                  <input
-                                    type="file"
-                                    accept="application/pdf"
-                                    onChange={handlePoemPdfUpload}
-                                    className="hidden"
-                                  />
                                 </label>
+                                <input
+                                  id="poem-pdf-file-input"
+                                  type="file"
+                                  accept="application/pdf"
+                                  onChange={handlePoemPdfUpload}
+                                  className="hidden"
+                                />
                               </div>
                               {newPoemPdfUrl?.startsWith("data:") && (
                                 <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
@@ -9763,9 +9775,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           <div className="flex gap-2">
                             <button
                               type="submit"
-                              className="flex-grow py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs cursor-pointer shadow"
+                              disabled={libSaving}
+                              className="flex-grow py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg text-xs cursor-pointer shadow flex items-center justify-center gap-1.5"
                             >
-                              {editingPoemId ? "💾 Save Poem Changes" : "➕ Add Poem to Catalog"}
+                              {libSaving ? (
+                                <>
+                                  <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full"></span>
+                                  <span>⏳ Saving & Synchronizing...</span>
+                                </>
+                              ) : (
+                                <span>{editingPoemId ? "💾 Save Poem Changes" : "➕ Add Poem to Catalog"}</span>
+                              )}
                             </button>
                             {editingPoemId && (
                               <button
