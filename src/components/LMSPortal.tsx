@@ -82,6 +82,24 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [studentSubTab, setStudentSubTab] = useState<"courses" | "assignments" | "announcements" | "payments" | "results" | "certificates">("courses");
   const [teacherSubTab, setTeacherSubTab] = useState<"tracker" | "grading" | "attendance" | "announcements" | "curriculum" | "admissions">("tracker");
 
+  // --- Teacher Registration states ---
+  const [tchName, setTchName] = useState("");
+  const [tchEmail, setTchEmail] = useState("");
+  const [tchPhone, setTchPhone] = useState("");
+  const [tchGender, setTchGender] = useState("male");
+  const [tchProfilePic, setTchProfilePic] = useState("");
+  const [tchSubjects, setTchSubjects] = useState("");
+  const [tchClass, setTchClass] = useState("beginner");
+  const [tchQualification, setTchQualification] = useState("");
+  const [tchBio, setTchBio] = useState("");
+  const [tchUsername, setTchUsername] = useState("");
+  const [tchPassword, setTchPassword] = useState("");
+  const [tchConfirmPassword, setTchConfirmPassword] = useState("");
+  const [tchLoading, setTchLoading] = useState(false);
+  const [tchError, setTchError] = useState("");
+  const [tchSuccess, setTchSuccess] = useState("");
+  const [tchRegisteredId, setTchRegisteredId] = useState("");
+
   // Copy helper
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const handleCopyField = (text: string, field: string) => {
@@ -788,7 +806,8 @@ Please verify my payment receipt and activate my admission. Jazakum Allahu Khair
       })
       .then(data => {
         setForgotResult(data.user);
-        setForgotWhatsapp(data.user.whatsapp || "");
+        const prefilledWhatsapp = data.user.role === "admin" ? "08122455759" : (data.user.whatsapp || "");
+        setForgotWhatsapp(prefilledWhatsapp);
         setSuccessMsg(`Account located successfully for ${data.user.name}.`);
       })
       .catch(err => {
@@ -808,7 +827,8 @@ Please verify my payment receipt and activate my admission. Jazakum Allahu Khair
   };
 
   const getWhatsAppLink = (user: any, phone: string) => {
-    const cleanedPhone = formatPhoneForWhatsApp(phone);
+    const targetPhone = user.role === "admin" ? "08122455759" : phone;
+    const cleanedPhone = formatPhoneForWhatsApp(targetPhone);
     const text = `As-salamu alaykum,
 
 Here are your login credentials for Abu Qoonitah Academy:
@@ -2081,6 +2101,94 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
         setDonSaving(false);
         setDonMessage("❌ Network error saving Donation Settings");
         console.error(err);
+      });
+  };
+
+  const handleRegisterTeacher = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTchLoading(true);
+    setTchError("");
+    setTchSuccess("");
+    setTchRegisteredId("");
+
+    // Local validation
+    if (!tchName.trim() || !tchEmail.trim() || !tchUsername.trim() || !tchPassword.trim()) {
+      setTchError("Please fill out all required fields.");
+      setTchLoading(false);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(tchEmail)) {
+      setTchError("Please enter a valid email address.");
+      setTchLoading(false);
+      return;
+    }
+
+    if (tchPassword !== tchConfirmPassword) {
+      setTchError("Password and Confirm Password do not match.");
+      setTchLoading(false);
+      return;
+    }
+
+    const token = localStorage.getItem("token") || "";
+
+    const payload = {
+      name: tchName,
+      email: tchEmail,
+      phone: tchPhone,
+      gender: tchGender,
+      profilePic: tchProfilePic,
+      subjects: tchSubjects,
+      assignedClass: tchClass,
+      qualification: tchQualification,
+      bio: tchBio,
+      username: tchUsername,
+      password: tchPassword,
+      confirmPassword: tchConfirmPassword,
+    };
+
+    fetch("/api/admin/register-teacher", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    })
+      .then((res) => {
+        if (!res.ok) {
+          return res.json().then((err) => {
+            throw new Error(err.error || "Failed to register teacher");
+          });
+        }
+        return res.json();
+      })
+      .then((data) => {
+        setTchLoading(false);
+        if (data.success) {
+          setTchSuccess(data.message || `Teacher successfully registered!`);
+          setTchRegisteredId(data.teacher.teacherId);
+          // Reset form fields
+          setTchName("");
+          setTchEmail("");
+          setTchPhone("");
+          setTchGender("male");
+          setTchProfilePic("");
+          setTchSubjects("");
+          setTchClass("beginner");
+          setTchQualification("");
+          setTchBio("");
+          setTchUsername("");
+          setTchPassword("");
+          setTchConfirmPassword("");
+        } else {
+          setTchError(data.error || "Failed to register teacher.");
+        }
+      })
+      .catch((err) => {
+        setTchLoading(false);
+        setTchError(err.message || "Network error registering teacher.");
       });
   };
 
@@ -7468,6 +7576,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     >
                       <span>💝 Donation Settings</span>
                     </button>
+                    <button
+                      onClick={() => setAdminSubTab("registerTeacher")}
+                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                        adminSubTab === "registerTeacher"
+                          ? "bg-emerald-700 text-white shadow"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                      }`}
+                    >
+                      <span>👨‍🏫 Register Teacher</span>
+                    </button>
                   </div>
 
                   {/* SUB-TAB 1: PAYMENTS & CLEARANCES */}
@@ -9684,6 +9802,255 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs cursor-pointer shadow disabled:bg-slate-400"
                         >
                           {donSaving ? "💾 Saving Settings..." : "💾 Save & Deploy Donation Settings"}
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
+                  {/* SUB-TAB 14: REGISTER TEACHER PANEL */}
+                  {adminSubTab === "registerTeacher" && (
+                    <div className="bg-white dark:bg-emerald-900 rounded-xl p-6 sm:p-8 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2 font-serif">
+                          <span>👨‍🏫 Register a New Teacher</span>
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1 font-sans">
+                          Create a new official teacher account and automatically configure access to the Teacher Dashboard.
+                        </p>
+                      </div>
+
+                      {tchError && (
+                        <div className="p-4 rounded-xl text-xs font-bold bg-red-50 text-red-800 border border-red-200">
+                          ⚠️ {tchError}
+                        </div>
+                      )}
+
+                      {tchSuccess && (
+                        <div className="p-4 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-850 border border-emerald-200 space-y-2">
+                          <div>🎉 {tchSuccess}</div>
+                          {tchRegisteredId && (
+                            <div className="mt-2 p-2.5 bg-white dark:bg-emerald-950/45 rounded-lg border border-emerald-250 font-mono text-[11px] space-y-1 text-emerald-950 dark:text-white">
+                              <span className="block font-bold text-emerald-800 uppercase tracking-wider text-[9px]">Generated Credentials</span>
+                              <div><span className="text-slate-400">Teacher ID:</span> <span className="font-bold">{tchRegisteredId}</span></div>
+                              <div><span className="text-slate-400">Please communicate this secure identifier to the teacher. They can now log in normally.</span></div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <form onSubmit={handleRegisterTeacher} className="space-y-6 text-xs text-left">
+                        {/* 1. Personal Info */}
+                        <div className="space-y-4 pt-2">
+                          <h4 className="font-bold text-emerald-950 dark:text-amber-100 text-sm border-b border-emerald-50 dark:border-emerald-900/35 pb-2">
+                            1. Personal Details
+                          </h4>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Full Name *</label>
+                              <input
+                                type="text"
+                                value={tchName}
+                                onChange={(e) => setTchName(e.target.value)}
+                                placeholder="Shaykh/Ustadh Full Name"
+                                required
+                                className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-medium"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Email Address *</label>
+                              <input
+                                type="email"
+                                value={tchEmail}
+                                onChange={(e) => setTchEmail(e.target.value)}
+                                placeholder="teacher@abuqoonitah.academy"
+                                required
+                                className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-medium"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Phone Number</label>
+                              <input
+                                type="text"
+                                value={tchPhone}
+                                onChange={(e) => setTchPhone(e.target.value)}
+                                placeholder="e.g., +234 812 245 5759"
+                                className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-mono font-medium"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Gender</label>
+                              <select
+                                value={tchGender}
+                                onChange={(e) => setTchGender(e.target.value)}
+                                className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-medium"
+                              >
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Profile Picture Drag-and-Drop / Selector */}
+                          <div className="space-y-2">
+                            <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Profile Picture</label>
+                            <div 
+                              className="border-2 border-dashed border-emerald-200 dark:border-emerald-850 hover:border-emerald-400 dark:hover:border-emerald-700 rounded-xl p-4 text-center cursor-pointer bg-emerald-50/10 dark:bg-emerald-950/10 transition-colors relative"
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const file = e.dataTransfer.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => setTchProfilePic(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            >
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setTchProfilePic(reader.result as string);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              />
+                              {tchProfilePic ? (
+                                <div className="flex flex-col items-center gap-2">
+                                  <img 
+                                    src={tchProfilePic} 
+                                    alt="Preview" 
+                                    className="w-16 h-16 rounded-full object-cover border border-emerald-200 shadow-sm"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold">Image selected successfully (Click or drag to change)</span>
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <p className="text-emerald-700 dark:text-emerald-300 font-semibold">Drag and drop an image here, or click to browse</p>
+                                  <p className="text-[10px] text-slate-400">Supports PNG, JPG, GIF up to 2MB</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Professional Details */}
+                        <div className="space-y-4 pt-2">
+                          <h4 className="font-bold text-emerald-950 dark:text-amber-100 text-sm border-b border-emerald-50 dark:border-emerald-900/35 pb-2">
+                            2. Professional Details
+                          </h4>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Subject(s) Taught</label>
+                              <input
+                                type="text"
+                                value={tchSubjects}
+                                onChange={(e) => setTchSubjects(e.target.value)}
+                                placeholder="e.g., Arabic Grammar, Fiqh, Tajweed"
+                                className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-medium"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Class / Level Assigned</label>
+                              <select
+                                value={tchClass}
+                                onChange={(e) => setTchClass(e.target.value)}
+                                className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-medium"
+                              >
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="advanced">Advanced</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Qualifications</label>
+                            <input
+                              type="text"
+                              value={tchQualification}
+                              onChange={(e) => setTchQualification(e.target.value)}
+                              placeholder="e.g., B.A. in Islamic Studies (Islamic University of Madinah)"
+                              className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-medium"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Biography / Background</label>
+                            <textarea
+                              rows={3}
+                              value={tchBio}
+                              onChange={(e) => setTchBio(e.target.value)}
+                              placeholder="A short biography detailing experience and background..."
+                              className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-medium"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 3. Credentials & Login */}
+                        <div className="space-y-4 pt-2">
+                          <h4 className="font-bold text-emerald-950 dark:text-amber-100 text-sm border-b border-emerald-50 dark:border-emerald-900/35 pb-2">
+                            3. Login Credentials
+                          </h4>
+
+                          <div className="space-y-1">
+                            <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Username *</label>
+                            <input
+                              type="text"
+                              value={tchUsername}
+                              onChange={(e) => setTchUsername(e.target.value)}
+                              placeholder="Choose username (e.g. shaykh_ahmed)"
+                              required
+                              className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-mono font-medium"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Password *</label>
+                              <input
+                                type="password"
+                                value={tchPassword}
+                                onChange={(e) => setTchPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                                className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-mono font-medium"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="font-bold text-emerald-700 dark:text-emerald-300 block uppercase tracking-wider text-[10px]">Confirm Password *</label>
+                              <input
+                                type="password"
+                                value={tchConfirmPassword}
+                                onChange={(e) => setTchConfirmPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                                className="w-full bg-emerald-50/40 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-950 dark:text-white font-mono font-medium"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={tchLoading}
+                          className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs cursor-pointer shadow disabled:bg-slate-400 transition-colors mt-2"
+                        >
+                          {tchLoading ? "⚙️ Processing Registration..." : "👨‍🏫 Register Teacher & Create Account"}
                         </button>
                       </form>
                     </div>

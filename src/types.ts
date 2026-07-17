@@ -25,6 +25,14 @@ export interface User {
   paymentMode?: string;
   receiptUrl?: string;
   whatsapp?: string;
+  teacherId?: string;
+  phone?: string;
+  gender?: string;
+  profilePic?: string;
+  subjects?: string;
+  assignedClass?: string;
+  qualification?: string;
+  bio?: string;
 }
 
 export interface Course {

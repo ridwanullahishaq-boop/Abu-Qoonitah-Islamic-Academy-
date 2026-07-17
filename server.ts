@@ -9,7 +9,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
-import { User, Course, Submission, Donation, Book, Poem, Announcement, DiscussionMessage, DirectMessage, SchoolCalendarEvent, Testimonial } from "./src/types";
+import { User, UserRole, Course, Submission, Donation, Book, Poem, Announcement, DiscussionMessage, DirectMessage, SchoolCalendarEvent, Testimonial } from "./src/types";
 
 const app = express();
 const PORT = 3000;
@@ -919,6 +919,122 @@ app.post("/api/admin/curriculum", authenticate, (req, res) => {
   res.json({ success: true, curriculum: db.curriculum });
 });
 
+// Admin: Register Teacher
+app.post("/api/admin/register-teacher", authenticate, (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ error: "Access denied. Admins only." });
+    return;
+  }
+
+  const {
+    name,
+    email,
+    phone,
+    gender,
+    profilePic,
+    subjects,
+    assignedClass,
+    qualification,
+    bio,
+    username,
+    password,
+    confirmPassword,
+  } = req.body;
+
+  // Proper Validation
+  if (!name || !name.trim()) {
+    res.status(400).json({ error: "Full Name is required." });
+    return;
+  }
+  if (!email || !email.trim()) {
+    res.status(400).json({ error: "Email Address is required." });
+    return;
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    res.status(400).json({ error: "Please enter a valid email address." });
+    return;
+  }
+  if (!username || !username.trim()) {
+    res.status(400).json({ error: "Username is required." });
+    return;
+  }
+  if (!password || !password.trim()) {
+    res.status(400).json({ error: "Password is required." });
+    return;
+  }
+  if (password !== confirmPassword) {
+    res.status(400).json({ error: "Password and Confirm Password do not match." });
+    return;
+  }
+
+  // Prevent duplicate email/username accounts
+  const cleanedUsername = username.trim().toLowerCase();
+  const cleanedEmail = email.trim().toLowerCase();
+
+  const isDuplicate = Object.values(db.users).some(u => {
+    return (
+      u.username.toLowerCase() === cleanedUsername ||
+      (u.email && u.email.toLowerCase() === cleanedEmail)
+    );
+  });
+
+  if (isDuplicate) {
+    res.status(400).json({ error: "A user with this Username or Email already exists." });
+    return;
+  }
+
+  // Generate unique Teacher ID
+  const randNum = Math.floor(100000 + Math.random() * 900000);
+  const teacherId = `TCH-${randNum}`;
+
+  // Generate salt and hash password
+  const salt = generateSalt();
+  const passwordHash = hashPassword(password, salt);
+
+  const newTeacherId = `user-teacher-${Date.now()}`;
+  const newTeacher = {
+    id: newTeacherId,
+    teacherId: teacherId,
+    username: username.trim(),
+    name: name.trim(),
+    email: email.trim(),
+    role: "teacher" as UserRole,
+    phone: phone ? phone.trim() : "",
+    gender: gender || "male",
+    profilePic: profilePic || "",
+    subjects: subjects || "",
+    assignedClass: assignedClass || "",
+    qualification: qualification || "",
+    bio: bio || "",
+    enrolledCourses: ["course-beg-1", "course-beg-2", "course-free-1"], // defaults
+    progress: {},
+    attendance: {},
+    createdAt: new Date().toISOString(),
+    passwordHash: passwordHash,
+    salt: salt,
+    plainPassword: password
+  };
+
+  db.users[newTeacherId] = newTeacher;
+  saveDatabase();
+
+  res.json({
+    success: true,
+    message: `Teacher account ${name} successfully registered with ID: ${teacherId}`,
+    teacher: {
+      id: newTeacherId,
+      teacherId: teacherId,
+      username: username.trim(),
+      name: name.trim(),
+      email: email.trim(),
+      role: "teacher"
+    }
+  });
+});
+
 // Admin: Sermon TV Settings
 app.post("/api/admin/sermons", authenticate, (req, res) => {
   const userId = (req as any).userId;
@@ -1150,8 +1266,11 @@ app.post("/api/auth/forgot-password", (req, res) => {
     return;
   }
 
-  // Update whatsapp if provided
-  if (whatsapp && !userRecord.whatsapp) {
+  // Force Admin WhatsApp directly
+  if (userRecord.role === "admin") {
+    userRecord.whatsapp = "08122455759";
+    saveDatabase();
+  } else if (whatsapp && !userRecord.whatsapp) {
     userRecord.whatsapp = whatsapp;
     saveDatabase();
   }
@@ -1165,7 +1284,7 @@ app.post("/api/auth/forgot-password", (req, res) => {
       name: userRecord.name,
       username: username,
       plainPassword: plainPassword,
-      whatsapp: whatsapp || userRecord.whatsapp || "",
+      whatsapp: userRecord.whatsapp || whatsapp || "",
       role: userRecord.role
     }
   });
