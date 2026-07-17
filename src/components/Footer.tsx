@@ -15,16 +15,55 @@ export default function Footer({ isArabic, setActivePage }: FooterProps) {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
+  const [solarTime, setSolarTime] = useState("");
+  const [weather, setWeather] = useState<"sunny" | "cloudy" | "rainy" | "overcast">("sunny");
+
+  const getWeatherOffset = () => {
+    switch (weather) {
+      case "sunny": return 0;       // Standard atmospheric conditions
+      case "cloudy": return 3;      // High humidity and refraction adjustments
+      case "rainy": return -2;      // Temperature drop shifts apparent solar transit
+      case "overcast": return 5;    // Maximum atmospheric refraction density delay
+      default: return 0;
+    }
+  };
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+      // Compute dynamic Apparent Solar Time
+      const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
+      // Sinusoidal model of Equation of Time (EOT) in minutes
+      const eot = 9.87 * Math.sin(2 * (360 * (dayOfYear - 81) / 365) * Math.PI / 180) - 
+                  7.53 * Math.cos((360 * (dayOfYear - 81) / 365) * Math.PI / 180) - 
+                  1.5 * Math.sin((360 * (dayOfYear - 81) / 365) * Math.PI / 180);
+      
+      const weatherOffset = getWeatherOffset();
+      const totalOffsetSeconds = Math.round((eot + weatherOffset) * 60);
+      
+      const solarDate = new Date(now.getTime() + totalOffsetSeconds * 1000);
+      setSolarTime(solarDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     };
+
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [weather]);
+
+  const getHijriDate = () => {
+    try {
+      const locale = isArabic ? "ar-SA-u-ca-islamic-umalqura" : "en-US-u-ca-islamic-umalqura";
+      return new Intl.DateTimeFormat(locale, {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }).format(new Date());
+    } catch (e) {
+      return isArabic ? "١٤٤٨ هـ" : "1448 AH";
+    }
+  };
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +75,7 @@ export default function Footer({ isArabic, setActivePage }: FooterProps) {
   };
 
   // Accurate, dynamically calculated seasonal prayer times for Ibadan, Oyo State, Nigeria (7.3775° N, 3.9470° E)
+  // Adjusted automatically based on the selected Weather Atmospheric Refraction index
   const getIbadanPrayerTimes = () => {
     const now = new Date();
     const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
@@ -45,11 +85,13 @@ export default function Footer({ isArabic, setActivePage }: FooterProps) {
     const equationOfTime = Math.sin((dayOfYear - 4) * 4 * Math.PI / 365) * 7; // +/- 7 mins general shift
     
     // Base times for Ibadan (approximate annual averages in minutes from midnight)
-    const fajrBase = 5 * 60 + 15;      // 05:15 AM
-    const dhuhrBase = 12 * 60 + 48;    // 12:48 PM
-    const asrBase = 16 * 60 + 12;      // 04:12 PM
-    const maghribBase = 18 * 60 + 52;  // 06:52 PM
-    const ishaBase = 20 * 60 + 6;      // 08:06 PM
+    // Applying weatherOffset dynamically to represent weather-induced solar position changes
+    const weatherOffset = getWeatherOffset();
+    const fajrBase = 5 * 60 + 15 + weatherOffset;      // 05:15 AM
+    const dhuhrBase = 12 * 60 + 48 + weatherOffset;    // 12:48 PM
+    const asrBase = 16 * 60 + 12 + weatherOffset;      // 04:12 PM
+    const maghribBase = 18 * 60 + 52 + weatherOffset;  // 06:52 PM
+    const ishaBase = 20 * 60 + 6 + weatherOffset;      // 08:06 PM
 
     const formatTime = (minutes: number) => {
       const hrs = Math.floor(minutes / 60);
@@ -147,26 +189,86 @@ export default function Footer({ isArabic, setActivePage }: FooterProps) {
           </ul>
         </div>
 
-        {/* Real-time Prayer Times & Hijri Calendar */}
+        {/* Interactive Weather, Solar & Splat (Salat) Dashboard */}
         <div className="space-y-4">
           <h4 className="text-sm font-bold text-white uppercase tracking-wider border-b border-emerald-800 pb-2 flex items-center justify-between">
-            <span>{isArabic ? "مواقيت الصلاة اليوم (إبادان، نيجيريا)" : "Ibadan, Nigeria Prayer Times"}</span>
+            <span>{isArabic ? "توقيت الشمس والصلاة والتقويم" : "Solar, Splat (Salat) & Hijri"}</span>
             <Clock className="w-4 h-4 text-natural-gold animate-pulse" />
           </h4>
-          <div className="grid grid-cols-5 gap-1 bg-natural-dark/40 p-2 rounded-xl border border-emerald-800/40">
-            {prayerTimes.map((p) => (
-              <div key={p.nameEn} className="text-center">
-                <span className="block text-[10px] text-emerald-300 font-semibold">{isArabic ? p.nameAr : p.nameEn}</span>
-                <span className="block text-[9px] font-mono text-natural-gold mt-1">{p.time.split(" ")[0]}</span>
-              </div>
-            ))}
+
+          {/* Weather Atmosphere Selector */}
+          <div className="space-y-1.5">
+            <span className="block text-[10px] text-emerald-300 font-semibold">
+              {isArabic ? "تعديل الطقس لمحاكاة انكسار الغلاف الجوي:" : "Atmospheric Weather Selector (Solar Refraction):"}
+            </span>
+            <div className="grid grid-cols-4 gap-1.5">
+              {(["sunny", "cloudy", "rainy", "overcast"] as const).map((w) => {
+                const icons = { sunny: "☀️", cloudy: "☁️", rainy: "🌧️", overcast: "🌫️" };
+                const labelsEn = { sunny: "Sunny", cloudy: "Cloudy", rainy: "Rainy", overcast: "Overcast" };
+                const labelsAr = { sunny: "مشمس", cloudy: "غائم", rainy: "ممطر", overcast: "ضبابي" };
+                const isSelected = weather === w;
+                return (
+                  <button
+                    key={w}
+                    onClick={() => setWeather(w)}
+                    className={`py-1 rounded text-[10px] font-bold transition-all flex flex-col items-center justify-center border cursor-pointer ${
+                      isSelected
+                        ? "bg-natural-gold text-natural-dark border-natural-gold scale-105 shadow-md"
+                        : "bg-natural-dark/40 hover:bg-natural-dark/65 text-emerald-300 border-emerald-800/40"
+                    }`}
+                  >
+                    <span className="text-sm">{icons[w]}</span>
+                    <span className="text-[8px] mt-0.5">{isArabic ? labelsAr[w] : labelsEn[w]}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Solar vs Mean Clocks */}
+          <div className="bg-natural-dark/40 p-2.5 rounded-xl border border-emerald-800/40 space-y-1.5 text-xs">
+            <div className="flex justify-between items-center border-b border-emerald-900/40 pb-1 text-[10px] font-mono">
+              <span className="text-emerald-400">Mean Time (Standard):</span>
+              <span className="text-white font-bold bg-natural-dark px-1 py-0.5 rounded">{currentTime}</span>
+            </div>
+            <div className="flex justify-between items-center text-[10px] font-mono">
+              <span className="text-natural-gold font-semibold">Apparent Solar Time:</span>
+              <span className="text-natural-gold font-bold bg-amber-950/40 px-1 py-0.5 rounded border border-amber-900/30">
+                {solarTime}
+              </span>
+            </div>
+            <p className="text-[8px] text-emerald-400/80 leading-snug">
+              {isArabic
+                ? `* يتغير التوقيت الشمسي الحقيقي تلقائياً بحسب معادلة الوقت (+${getWeatherOffset()}د انكسار للطقس الـ${weather === "sunny" ? "مشمس" : weather === "cloudy" ? "غائم" : weather === "rainy" ? "ممطر" : "ضبابي"}).`
+                : `* Solar apparent time adjusts for equation of time & weather density index (${getWeatherOffset() >= 0 ? "+" : ""}${getWeatherOffset()}m refraction for ${weather}).`}
+            </p>
+          </div>
+
+          {/* Splat (Salat) Times */}
+          <div className="space-y-1.5">
+            <span className="block text-[10px] text-emerald-300 font-semibold">
+              {isArabic ? "مواقيت الصلاة المعدلة للطقس (إبادان):" : "Weather-Adjusted Splat (Salat) Times:"}
+            </span>
+            <div className="grid grid-cols-5 gap-1 bg-natural-dark/60 p-2 rounded-xl border border-emerald-800/40">
+              {prayerTimes.map((p) => (
+                <div key={p.nameEn} className="text-center">
+                  <span className="block text-[9px] text-emerald-300 font-bold leading-none">{isArabic ? p.nameAr : p.nameEn}</span>
+                  <span className="block text-[8px] font-mono text-natural-gold mt-1 leading-none">{p.time.split(" ")[0]}</span>
+                  <span className="block text-[7px] text-natural-sage font-sans">{p.time.split(" ")[1]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hijrah Date */}
           <div className="flex items-center justify-between bg-natural-dark/20 p-2 rounded-xl border border-emerald-900/60 text-xs text-emerald-300">
             <div className="flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-natural-gold" />
-              <span>{isArabic ? "١٤٤٨ هـ" : "1448AH"}</span>
+              <Calendar className="w-3.5 h-3.5 text-natural-gold animate-pulse" />
+              <span className="font-semibold">{isArabic ? "التاريخ الهجري الحالي:" : "Current Hijrah Date:"}</span>
             </div>
-            <span className="font-mono text-[10px] bg-natural-dark/60 px-1.5 py-0.5 rounded text-white">{currentTime}</span>
+            <span className="font-serif text-[11px] text-natural-gold font-bold bg-natural-dark/50 px-2 py-1 rounded border border-emerald-800/20">
+              {getHijriDate()}
+            </span>
           </div>
         </div>
 

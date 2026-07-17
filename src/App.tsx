@@ -15,6 +15,7 @@ import LMSPortal from "./components/LMSPortal";
 import AIChatBot from "./components/AIChatBot";
 import OnlineMadrasah from "./components/OnlineMadrasah";
 import FreeCourses from "./components/FreeCourses";
+import GlobalAIAssistant from "./components/GlobalAIAssistant";
 import { User } from "./types";
 
 export default function App() {
@@ -181,6 +182,9 @@ export default function App() {
           {isArabic ? "تواصل واتساب" : "WhatsApp Chat"}
         </span>
       </a>
+
+      {/* PERSISTENT FLOATING ACADEMY AI ASSISTANT BUTTON */}
+      <GlobalAIAssistant isArabic={isArabic} />
 
     </div>
   );
