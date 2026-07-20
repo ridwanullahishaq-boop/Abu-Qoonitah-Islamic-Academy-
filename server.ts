@@ -17,8 +17,8 @@ const PORT = 3000;
 const DB_PATH = path.join(process.cwd(), "db.json");
 
 // --- SUPABASE CLIENT CONFIGURATION & SYNCHRONIZATION ---
-const rawSupabaseUrl = (process.env.SUPABASE_URL || "https://fhmgbmrsnwrkgfvucuvi.supabase.co").trim();
-const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZobWdibXJzbndya2dmdnVjdXZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2NzE2ODQsImV4cCI6MjA5OTI0NzY4NH0.zcU4R6uRo5d1YlSKd1IIXUuToIpxNRyS36N6U1NQ_A4").trim();
+const rawSupabaseUrl = (process.env.SUPABASE_URL || "https://mghikpkippboxeujukpm.supabase.co").trim();
+const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1naGlrcGtpcHBib3hldWp1a3BtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2Njc1OTgsImV4cCI6MjA5OTI0MzU5OH0.VgAtoV3aYmZ2WQW1QBgFwrDvb4Ei-bd0UrHn8XzN17w").trim();
 
 // Automatically sanitize URL to handle trailing /rest/v1/ paths
 let SUPABASE_URL = rawSupabaseUrl;
@@ -724,6 +724,27 @@ function saveDatabase() {
   }
 }
 
+async function saveDatabaseAsync() {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf8");
+    if (supabase) {
+      const { error } = await supabase
+        .from("academy_state")
+        .upsert({ id: "main_db", data: db, updated_at: new Date().toISOString() });
+
+      if (error) {
+        console.error("Could not save database state to Supabase:", error.message);
+        throw new Error("Supabase cloud backup failed: " + error.message);
+      } else {
+        console.log("Successfully backed up database state to Supabase Cloud!");
+      }
+    }
+  } catch (error: any) {
+    console.error("Error saving database:", error);
+    throw error;
+  }
+}
+
 // Load DB immediately
 loadDatabase();
 
@@ -1342,7 +1363,7 @@ app.post("/api/auth/forgot-password", (req, res) => {
   });
 });
 
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   const { username, password, name, email, level, whyJoin, dob, country, state, paymentMode, receiptUrl, whatsapp } = req.body;
   if (!username || !password || !name || !email) {
     res.status(400).json({ error: "Username, password, name, and email are required." });
@@ -1382,13 +1403,20 @@ app.post("/api/auth/register", (req, res) => {
   };
 
   db.users[userId] = { ...newUser, passwordHash, salt };
-  saveDatabase();
 
-  // Generate session token automatically
-  const token = crypto.randomBytes(32).toString("hex");
-  sessions[token] = userId;
+  try {
+    await saveDatabaseAsync();
 
-  res.json({ token, user: newUser });
+    // Generate session token automatically
+    const token = crypto.randomBytes(32).toString("hex");
+    sessions[token] = userId;
+
+    res.json({ token, user: newUser });
+  } catch (error: any) {
+    // Revert local memory state on failure so the database doesn't get out of sync with cloud!
+    delete db.users[userId];
+    res.status(500).json({ error: "Database save failed: " + error.message });
+  }
 });
 
 // Change Password/Credentials (Admin/User security settings)

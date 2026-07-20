@@ -88,14 +88,15 @@ async function loadDbFromSupabase(): Promise<any> {
 // Save database to Supabase
 async function saveDbToSupabase() {
   if (!supabase || !clientDb) return;
-  try {
-    await supabase
-      .from("academy_state")
-      .upsert({ id: "main_db", data: clientDb, updated_at: new Date().toISOString() });
-    console.log("Supabase Fallback: DB State backed up to cloud!");
-  } catch (err) {
-    console.error("Supabase fallback save error:", err);
+  const { error } = await supabase
+    .from("academy_state")
+    .upsert({ id: "main_db", data: clientDb, updated_at: new Date().toISOString() });
+
+  if (error) {
+    console.error("Supabase fallback save error:", error.message);
+    throw new Error("Supabase cloud save failed: " + error.message);
   }
+  console.log("Supabase Fallback: DB State backed up to cloud!");
 }
 
 // Probe to check if local server is working or we are on Netlify
@@ -326,7 +327,7 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
   }
 
   if (path === "/api/auth/register" && method === "POST") {
-    const { username, email, password, name, role, dob, level, country, state, receiptUrl, whyJoin } = body || {};
+    const { username, email, password, name, role, dob, level, country, state, receiptUrl, whyJoin, whatsapp, paymentMode } = body || {};
     
     const exists = Object.values(clientDb.users).some(
       (u: any) => u.username?.toLowerCase() === username?.toLowerCase() || u.email?.toLowerCase() === email?.toLowerCase()
@@ -354,15 +355,21 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
       state,
       receiptUrl,
       whyJoin,
+      whatsapp: whatsapp || "",
+      paymentMode: paymentMode || "",
       passwordHash,
       salt,
       plainPassword: password
     };
 
     clientDb.users[userId] = newUser;
-    await saveDbToSupabase();
-    
-    return mockResponse({ success: true, token: userId, user: newUser });
+    try {
+      await saveDbToSupabase();
+      return mockResponse({ success: true, token: userId, user: newUser });
+    } catch (err: any) {
+      delete clientDb.users[userId];
+      return mockResponse({ error: "Database save failed: " + err.message }, 500);
+    }
   }
 
   if (path === "/api/auth/me" && method === "GET") {
