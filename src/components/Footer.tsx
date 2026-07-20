@@ -127,11 +127,9 @@ export default function Footer({ isArabic, setActivePage }: FooterProps) {
         {/* About & Branding Column */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="Abu Qoonitah Islamic Academy Logo"
-              className="w-12 h-12 rounded-lg shadow-sm border border-emerald-800/40 shrink-0 object-cover"
-            />
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center border-2 border-natural-gold shadow-sm shrink-0">
+              <span className="text-natural-gold font-serif font-bold text-lg tracking-tight">AQ</span>
+            </div>
             <div>
               <span className="block font-sans font-bold text-sm tracking-widest text-white uppercase">
                 Abu Qoonitah

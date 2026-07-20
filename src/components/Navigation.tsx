@@ -76,11 +76,9 @@ export default function Navigation({
         <div className="flex justify-between h-20">
           {/* Logo & Academy Name */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNavClick("home")}>
-            <img
-              src="/logo.png"
-              alt="Abu Qoonitah Islamic Academy Logo"
-              className="w-12 h-12 rounded-lg shadow-sm border border-emerald-800/40 shrink-0 object-cover"
-            />
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-850 to-emerald-950 dark:from-emerald-900 dark:to-emerald-950 flex items-center justify-center border-2 border-natural-gold shadow-sm shrink-0">
+              <span className="text-natural-gold font-serif font-bold text-lg tracking-tight">AQ</span>
+            </div>
             <div>
               <span className="block text-lg font-bold text-natural-green dark:text-amber-100 font-sans leading-none tracking-tight uppercase">
                 Abu Qoonitah
@@ -294,11 +292,9 @@ export default function Navigation({
         <div className="lg:hidden bg-white dark:bg-emerald-950 border-t border-emerald-100 dark:border-emerald-900 px-4 pt-4 pb-6 space-y-1">
           {/* Centered Mobile Logo */}
           <div className="flex flex-col items-center justify-center pb-4 border-b border-emerald-50 dark:border-emerald-900/40">
-            <img
-              src="/logo.png"
-              alt="Abu Qoonitah Islamic Academy Logo"
-              className="w-16 h-16 rounded-xl shadow-md object-cover"
-            />
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-800 to-emerald-950 dark:from-emerald-900 dark:to-emerald-950 flex items-center justify-center border-2 border-natural-gold shadow-md shrink-0">
+              <span className="text-natural-gold font-serif font-bold text-xl tracking-tight">AQ</span>
+            </div>
             <div className="text-center mt-2">
               <span className="block text-sm font-bold text-natural-green dark:text-amber-100 uppercase tracking-wide">
                 Abu Qoonitah
