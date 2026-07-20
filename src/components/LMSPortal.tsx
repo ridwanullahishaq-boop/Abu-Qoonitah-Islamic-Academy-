@@ -3673,7 +3673,6 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               src="/logo.png"
               alt="Abu Qoonitah Islamic Academy Logo"
               className="w-20 h-20 rounded-2xl shadow-md object-cover"
-              referrerPolicy="no-referrer"
             />
             <div className="text-center">
               <h3 className="font-serif font-bold text-xs uppercase tracking-wider text-natural-green dark:text-amber-100">

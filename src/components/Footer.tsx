@@ -131,7 +131,6 @@ export default function Footer({ isArabic, setActivePage }: FooterProps) {
               src="/logo.png"
               alt="Abu Qoonitah Islamic Academy Logo"
               className="w-12 h-12 rounded-lg shadow-sm border border-emerald-800/40 shrink-0 object-cover"
-              referrerPolicy="no-referrer"
             />
             <div>
               <span className="block font-sans font-bold text-sm tracking-widest text-white uppercase">

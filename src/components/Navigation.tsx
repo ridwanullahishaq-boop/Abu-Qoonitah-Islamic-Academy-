@@ -80,7 +80,6 @@ export default function Navigation({
               src="/logo.png"
               alt="Abu Qoonitah Islamic Academy Logo"
               className="w-12 h-12 rounded-lg shadow-sm border border-emerald-800/40 shrink-0 object-cover"
-              referrerPolicy="no-referrer"
             />
             <div>
               <span className="block text-lg font-bold text-natural-green dark:text-amber-100 font-sans leading-none tracking-tight uppercase">
@@ -299,7 +298,6 @@ export default function Navigation({
               src="/logo.png"
               alt="Abu Qoonitah Islamic Academy Logo"
               className="w-16 h-16 rounded-xl shadow-md object-cover"
-              referrerPolicy="no-referrer"
             />
             <div className="text-center mt-2">
               <span className="block text-sm font-bold text-natural-green dark:text-amber-100 uppercase tracking-wide">
