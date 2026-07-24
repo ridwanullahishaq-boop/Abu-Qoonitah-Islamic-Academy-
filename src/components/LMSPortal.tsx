@@ -7,8 +7,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { User, Course, Submission, Announcement, SchoolCalendarEvent, DiscussionMessage, DirectMessage, AppNotification } from "../types";
 import {
   BookOpen, Users, Video, FileText, CheckCircle2, AlertTriangle, Send, Mail, Key, Shield, UserPlus, UserCheck,
-  ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff
+  ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive
 } from "lucide-react";
+import { AutoSaveBadge, useAutoSave, AutoSaveNotesVault } from "./AutoSaveManager";
 
 interface LMSPortalProps {
   isArabic: boolean;
@@ -451,6 +452,88 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [activeContact, setActiveContact] = useState<any | null>(null);
   const [dmHistory, setDmHistory] = useState<DirectMessage[]>([]);
   const [newDMMsg, setNewDMMsg] = useState("");
+
+  // --- Auto-Save Hooks ---
+  const assignDraftKey = activeAssign ? `assign_${currentUser?.id}_${activeAssign.id}` : "";
+  const { isSaving: isAssignSaving, lastSavedTime: assignSavedTime, clearDraft: clearAssignDraft } = useAutoSave(
+    assignDraftKey,
+    { assignText, uploadedPhotos, uploadedAudio },
+    { enabled: !!activeAssign, debounceMs: 500 }
+  );
+
+  const quizDraftKey = activeQuiz ? `quiz_${currentUser?.id}_${activeQuiz.id}` : "";
+  const { isSaving: isQuizSaving, lastSavedTime: quizSavedTime, clearDraft: clearQuizDraft } = useAutoSave(
+    quizDraftKey,
+    { quizAnswers, quizTimeLeft },
+    { enabled: !!activeQuiz && !quizScore, debounceMs: 500 }
+  );
+
+  const { isSaving: isForumSaving } = useAutoSave(
+    `forum_${currentUser?.id}`,
+    newForumMsg,
+    { enabled: !!newForumMsg, debounceMs: 600 }
+  );
+
+  const { isSaving: isDmSaving } = useAutoSave(
+    `dm_${currentUser?.id}_${activeContact?.id || 'none'}`,
+    newDMMsg,
+    { enabled: !!activeContact && !!newDMMsg, debounceMs: 600 }
+  );
+
+  const handleOpenAssignWithAutoSave = (assign: any) => {
+    setActiveAssign(assign);
+    const key = `lms_autosave_assign_${currentUser?.id}_${assign.id}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.data) {
+          if (parsed.data.assignText !== undefined) setAssignText(parsed.data.assignText);
+          if (parsed.data.uploadedPhotos) setUploadedPhotos(parsed.data.uploadedPhotos);
+          if (parsed.data.uploadedAudio) {
+            setUploadedAudio(parsed.data.uploadedAudio);
+            setAudioPreviewUrl(parsed.data.uploadedAudio);
+          }
+          return;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setAssignText("");
+    setUploadedPhotos([]);
+    setUploadedAudio(null);
+    setAudioPreviewUrl(null);
+  };
+
+  const handleOpenQuizWithAutoSave = (quiz: any) => {
+    const questionsToShow = quiz.limitQuestions && quiz.limitQuestions < quiz.questions.length
+      ? quiz.questions.slice(0, quiz.limitQuestions)
+      : quiz.questions;
+    setActiveQuiz({ ...quiz, questions: questionsToShow });
+    setQuizScore(null);
+
+    const key = `lms_autosave_quiz_${currentUser?.id}_${quiz.id}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.data) {
+          if (parsed.data.quizAnswers) setQuizAnswers(parsed.data.quizAnswers);
+          if (parsed.data.quizTimeLeft !== undefined && parsed.data.quizTimeLeft !== null) {
+            setQuizTimeLeft(parsed.data.quizTimeLeft);
+          } else {
+            setQuizTimeLeft((quiz.durationMinutes || 10) * 60);
+          }
+          return;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setQuizAnswers({});
+    setQuizTimeLeft((quiz.durationMinutes || 10) * 60);
+  };
 
   // Teacher states
   const [allStudents, setAllStudents] = useState<any[]>([]);
@@ -4210,6 +4293,11 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               )}
             </div>
 
+            {/* Auto-Saver Protection Badge */}
+            <div className="pt-2 flex justify-center">
+              <AutoSaveBadge label="Auto-Saver Vault Active" />
+            </div>
+
             {/* Change Credentials Form Drawer Toggler */}
             <details className="text-left text-xs bg-natural-sage/10 dark:bg-natural-green/25 p-2.5 rounded-2xl border border-emerald-50 dark:border-emerald-900/30">
               <summary className="font-bold cursor-pointer text-natural-green dark:text-amber-200 list-none flex justify-between items-center select-none font-serif">
@@ -4647,6 +4735,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       }`}
                     >
                       📢 School Announcements
+                    </button>
+                    <button
+                      onClick={() => { setStudentSubTab("vault" as any); setSelectedCourse(null); }}
+                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                        studentSubTab === ("vault" as any)
+                          ? "bg-emerald-700 text-white shadow-sm"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                      }`}
+                    >
+                      <HardDrive className="w-3.5 h-3.5 text-amber-300" />
+                      <span>💾 Auto-Saver Notes Vault</span>
                     </button>
                     <button
                       onClick={() => { setStudentSubTab("payments"); setSelectedCourse(null); }}
@@ -5134,7 +5233,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   {activeQuiz && (
                                     <div className="bg-white dark:bg-emerald-950 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800 space-y-4 text-xs animate-fade-in text-emerald-950 dark:text-white">
                                       <div className="flex justify-between items-center border-b border-emerald-100 dark:border-emerald-800 pb-2">
-                                        <h5 className="font-bold text-sm text-emerald-900 dark:text-amber-100">{activeQuiz.title}</h5>
+                                        <div className="flex items-center gap-2">
+                                          <h5 className="font-bold text-sm text-emerald-900 dark:text-amber-100">{activeQuiz.title}</h5>
+                                          <AutoSaveBadge isSaving={isQuizSaving} lastSavedTime={quizSavedTime} onClear={clearQuizDraft} label="CBT Auto-Saved" />
+                                        </div>
                                         {quizTimeLeft !== null && !quizScore && (
                                           <div className="flex flex-col items-end gap-1">
                                             <div className={`px-2.5 py-1 rounded font-mono font-bold text-xs flex items-center gap-1.5 ${
@@ -5368,6 +5470,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                           <h4 className="font-bold text-emerald-900 dark:text-amber-100 flex items-center gap-1.5">
                                             <span>📝 Worksheet Answer Submission Sheet</span>
                                           </h4>
+                                          <AutoSaveBadge isSaving={isAssignSaving} lastSavedTime={assignSavedTime} onClear={clearAssignDraft} label="Worksheet Auto-Saved" />
                                           <button 
                                             type="button" 
                                             onClick={() => { setActiveAssign(null); setUploadedPhotos([]); setUploadedAudio(null); setAudioPreviewUrl(null); }}
@@ -5540,7 +5643,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                       </form>
                                     ) : (
                                       <button
-                                        onClick={() => { setActiveAssign(assign); setAssignText(""); setUploadedPhotos([]); setUploadedAudio(null); setAudioPreviewUrl(null); }}
+                                        onClick={() => handleOpenAssignWithAutoSave(assign)}
                                         className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold rounded text-xs flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
                                       >
                                         <span>Write & Submit Answer Worksheet</span>
@@ -5955,6 +6058,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     );
                   })()}
 
+                  {studentSubTab === ("vault" as any) && (
+                    <AutoSaveNotesVault userId={currentUser.id} />
+                  )}
+
                   {studentSubTab === "certificates" && (
                     <div className="space-y-6">
                       {/* CSS style block for print formatting */}
@@ -6334,6 +6441,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     >
                       <BookOpen className="w-3.5 h-3.5" />
                       <span>Classroom Curriculum</span>
+                    </button>
+                    <button
+                      onClick={() => setTeacherSubTab("vault" as any)}
+                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                        teacherSubTab === ("vault" as any)
+                          ? "bg-emerald-700 text-white shadow-sm"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                      }`}
+                    >
+                      <HardDrive className="w-3.5 h-3.5 text-amber-300" />
+                      <span>💾 Auto-Saver Notes Vault</span>
                     </button>
                     <button
                       onClick={() => setTeacherSubTab("admissions")}
@@ -7867,6 +7985,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                   )}
 
                   {/* SUB-TAB 5: CURRICULUM & MATERIAL PUBLISHING */}
+                  {teacherSubTab === ("vault" as any) && (
+                    <AutoSaveNotesVault userId={currentUser.id} />
+                  )}
+
                   {teacherSubTab === "curriculum" && (
                     <div className="space-y-6">
                       <div className="bg-white dark:bg-emerald-900 rounded-xl p-6 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-4">
@@ -8678,6 +8800,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       👥 Community Testimonials
                     </button>
                     <button
+                      onClick={() => setAdminSubTab("vault" as any)}
+                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                        adminSubTab === ("vault" as any)
+                          ? "bg-emerald-700 text-white shadow"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                      }`}
+                    >
+                      <HardDrive className="w-3.5 h-3.5 text-amber-300" />
+                      <span>💾 Auto-Saver Notes Vault</span>
+                    </button>
+                    <button
                       onClick={() => setAdminSubTab("calendar")}
                       className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
                         adminSubTab === "calendar"
@@ -8919,6 +9052,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                   )}
 
                   {/* SUB-TAB 3: COMMUNITY TESTIMONIALS */}
+                  {adminSubTab === ("vault" as any) && (
+                    <AutoSaveNotesVault userId={currentUser.id} />
+                  )}
+
                   {adminSubTab === "testimonials" && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                       {/* Form */}
