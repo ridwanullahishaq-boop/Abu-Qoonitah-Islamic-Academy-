@@ -177,6 +177,82 @@ export default function OnlineMadrasah({ isArabic, onEnrollClick }: OnlineMadras
         </div>
       </section>
 
+      {/* OFFICIAL TUITION & BANK ACCOUNT DETAILS BANNER */}
+      <section className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 text-white rounded-3xl p-6 sm:p-8 border-2 border-amber-400/40 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-800/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-amber-400/20 rounded-xl border border-amber-400/30">
+              <span className="text-xl">💳</span>
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-base text-amber-300">
+                {isArabic ? "تفاصيل الرسوم الدراسية والحساب البنكي الرسمي" : "Official Tuition Fees & Bank Account Details"}
+              </h3>
+              <p className="text-xs text-emerald-200">
+                {isArabic ? "رسوم الفصل الدراسي وتفاصيل الحساب المعتمد للتسجيل" : "Semester tuition structure and verified bank account for admissions"}
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1 bg-amber-400 text-emerald-950 font-extrabold text-xs rounded-full uppercase tracking-wider self-start sm:self-center">
+            {isArabic ? "رسوم التسجيل" : "Tuition Rates"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div className="p-4 bg-white/10 rounded-2xl border border-emerald-700/60 space-y-1.5">
+            <span className="text-[11px] text-amber-300 font-extrabold uppercase tracking-wider block">
+              {isArabic ? "١. الدفع الكامل للفصل الدراسي (الترم)" : "1. Full Semester Payment"}
+            </span>
+            <div className="text-xl font-extrabold text-white font-mono">
+              ₦15,000 <span className="text-xs font-normal text-emerald-200">NGN</span>
+            </div>
+            <p className="text-xs text-emerald-100 leading-relaxed">
+              {isArabic ? "رسوم الفصل الدراسي الكامل هي ١٥,٠٠٠ نيرة نيجيرية." : "Full payment for a semester is ₦15,000."}
+            </p>
+          </div>
+
+          <div className="p-4 bg-white/10 rounded-2xl border border-emerald-700/60 space-y-1.5">
+            <span className="text-[11px] text-amber-300 font-extrabold uppercase tracking-wider block">
+              {isArabic ? "٢. نظام الأقساط الميسرة" : "2. Installment Payment Plan"}
+            </span>
+            <div className="text-xl font-extrabold text-white font-mono">
+              ₦5,000 <span className="text-xs font-normal text-emerald-200">NGN × 3 {isArabic ? "مرات" : "Times"}</span>
+            </div>
+            <p className="text-xs text-emerald-100 leading-relaxed">
+              {isArabic ? "الدفع بالأقساط هو ٥,٠٠٠ نيرة ثلاث مرات في بوابة التسجيل." : "Installment payments is ₦5,000 three times in registration portal."}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 bg-emerald-950/90 rounded-2xl border border-amber-400/30 space-y-2 font-sans shadow-inner">
+          <div className="flex justify-between items-center border-b border-emerald-800 pb-1.5 text-xs">
+            <span className="font-extrabold text-amber-300 tracking-wider uppercase">
+              {isArabic ? "🏦 بيانات الحساب البنكي الرسمي:" : "🏦 OFFICIAL BANK ACCOUNT DETAILS:"}
+            </span>
+            <span className="text-emerald-300 text-xs">{isArabic ? "المستفيد الرسمي" : "Official Beneficiary"}</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+            <div className="bg-white/5 p-2.5 rounded-xl border border-emerald-800/60">
+              <span className="text-[10px] text-emerald-300 block font-bold uppercase">{isArabic ? "اسم البنك" : "BANK NAME"}</span>
+              <span className="font-extrabold text-white font-mono text-sm">Opay</span>
+            </div>
+            <div className="bg-white/5 p-2.5 rounded-xl border border-emerald-800/60">
+              <span className="text-[10px] text-emerald-300 block font-bold uppercase">{isArabic ? "رقم الحساب" : "BANK NUMBER / ACCOUNT NO."}</span>
+              <span className="font-extrabold text-amber-300 font-mono text-base tracking-widest block select-all">
+                8122455759
+              </span>
+            </div>
+            <div className="bg-white/5 p-2.5 rounded-xl border border-emerald-800/60">
+              <span className="text-[10px] text-emerald-300 block font-bold uppercase">{isArabic ? "اسم الحساب" : "ACCOUNT NAME"}</span>
+              <span className="font-extrabold text-white text-xs block">
+                Ishaq Ridwanullah Babatunde
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* 4. CALL TO ACTION FOR ADMISSIONS */}
       <section className="bg-natural-green text-white rounded-3xl p-8 sm:p-12 text-center space-y-6 relative overflow-hidden shadow-lg border border-emerald-700">
         <div className="absolute top-[-50px] left-[-50px] w-48 h-48 rounded-full border-[15px] border-emerald-800/30" />

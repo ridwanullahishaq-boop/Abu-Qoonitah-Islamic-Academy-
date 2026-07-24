@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { User, Course, Submission, Announcement, SchoolCalendarEvent, DiscussionMessage, DirectMessage, AppNotification } from "../types";
 import {
   BookOpen, Users, Video, FileText, CheckCircle2, AlertTriangle, Send, Mail, Key, Shield, UserPlus, UserCheck,
-  ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive
+  ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive, CreditCard
 } from "lucide-react";
 import { AutoSaveBadge, useAutoSave, AutoSaveNotesVault } from "./AutoSaveManager";
 
@@ -3685,15 +3685,89 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               />
             </div>
 
+            {/* OFFICIAL SEMESTER TUITION RATES & BANK ACCOUNT DETAILS NOTICE */}
+            <div className="p-4 bg-gradient-to-br from-emerald-900 to-emerald-950 text-white rounded-2xl border-2 border-amber-400/40 shadow-md space-y-3">
+              <div className="flex items-center justify-between border-b border-emerald-800/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-amber-300" />
+                  <h4 className="font-serif font-bold text-xs text-amber-200">
+                    💳 Tuition Fee Rates & Bank Transfer Details
+                  </h4>
+                </div>
+                <span className="px-2 py-0.5 bg-amber-400 text-emerald-950 text-[10px] font-extrabold rounded-full uppercase tracking-wider">
+                  Registration Portal
+                </span>
+              </div>
+
+              {/* Tuition Breakdown Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                <div className="p-3 bg-white/10 rounded-xl border border-emerald-700/60 backdrop-blur-xs space-y-1">
+                  <span className="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider block">
+                    1. FULL SEMESTER PAYMENT
+                  </span>
+                  <div className="text-base font-extrabold text-white font-mono">
+                    ₦15,000 <span className="text-xs font-normal text-emerald-200">NGN</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-200 leading-snug">
+                    Full payment for a semester is ₦15,000 NGN.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-white/10 rounded-xl border border-emerald-700/60 backdrop-blur-xs space-y-1">
+                  <span className="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider block">
+                    2. INSTALLMENT PAYMENTS
+                  </span>
+                  <div className="text-base font-extrabold text-white font-mono">
+                    ₦5,000 <span className="text-xs font-normal text-emerald-200">NGN × 3 Times</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-200 leading-snug">
+                    Installment payments is ₦5,000 three times in registration portal.
+                  </p>
+                </div>
+              </div>
+
+              {/* Bank Account Credentials Box */}
+              <div className="p-3 bg-emerald-950/90 rounded-xl border border-amber-400/30 font-sans space-y-1.5 shadow-inner">
+                <div className="flex justify-between items-center border-b border-emerald-800/80 pb-1 text-[10px]">
+                  <span className="font-extrabold text-amber-300 tracking-wider uppercase">
+                    🏦 ACADEMY BANK ACCOUNT DETAILS
+                  </span>
+                  <span className="text-emerald-300 text-[9px]">Official Transfer Beneficiary</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs pt-1">
+                  <div>
+                    <span className="text-[9px] text-emerald-400 block font-bold uppercase">BANK NAME</span>
+                    <span className="font-bold text-white font-mono text-xs">Opay</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-emerald-400 block font-bold uppercase">BANK NUMBER / ACCOUNT NO.</span>
+                    <span className="font-extrabold text-amber-300 font-mono text-sm tracking-widest block select-all">
+                      8122455759
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-emerald-400 block font-bold uppercase">ACCOUNT NAME</span>
+                    <span className="font-bold text-white text-xs block">
+                      Ishaq Ridwanullah Babatunde
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block">PAYMENT MODE</span>
+                <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider block">PAYMENT MODE & OPTION</span>
                 <select
                   value={regPaymentMode}
                   onChange={(e) => setRegPaymentMode(e.target.value)}
                   className="w-full bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2.5 text-xs text-emerald-900 dark:text-white font-semibold"
                 >
-                  <option value="Opay">Opay (Admin Account: 812245759)</option>
+                  <option value="Opay - Full Semester Payment (₦15,000 NGN)">Opay - Full Semester Payment (₦15,000 NGN)</option>
+                  <option value="Opay - Installment Payment 1 of 3 (₦5,000 NGN)">Opay - Installment Payment 1 of 3 (₦5,000 NGN)</option>
+                  <option value="Opay - Installment Payment 2 of 3 (₦5,000 NGN)">Opay - Installment Payment 2 of 3 (₦5,000 NGN)</option>
+                  <option value="Opay - Installment Payment 3 of 3 (₦5,000 NGN)">Opay - Installment Payment 3 of 3 (₦5,000 NGN)</option>
                 </select>
               </div>
 
@@ -4072,7 +4146,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   <div className="grid grid-cols-2 gap-4 text-xs">
                                     <div>
                                       <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">PAYMENT MODE</span>
-                                      <span className="font-bold text-emerald-800 dark:text-natural-gold">{item.paymentMode || "Opay (Admin Account 812245759)"}</span>
+                                      <span className="font-bold text-emerald-800 dark:text-natural-gold">{item.paymentMode || "Opay (Account 8122455759 - Ishaq Ridwanullah Babatunde)"}</span>
                                     </div>
                                     <div>
                                       <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">STARTING ACADEMIC PLACEMENT</span>
@@ -5738,16 +5812,18 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             </div>
                           </div>
 
-                          <div className="p-2.5 bg-amber-500/5 border border-amber-500/10 rounded space-y-1.5">
-                            <span className="font-bold text-emerald-900 dark:text-amber-100 block">💳 Official Tuition Rates:</span>
-                            <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
-                              <div className="bg-white/40 dark:bg-emerald-950/20 p-1.5 rounded border border-emerald-100/50">
-                                <span className="block font-bold text-emerald-700 dark:text-amber-300">Semester Fee</span>
-                                <span className="text-emerald-900 dark:text-white">₦15,000 NGN</span>
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
+                            <span className="font-bold text-emerald-900 dark:text-amber-100 block text-xs">💳 Official Semester Tuition & Installment Rates:</span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                              <div className="bg-white dark:bg-emerald-950/60 p-2 rounded-lg border border-emerald-200 dark:border-emerald-800 space-y-0.5">
+                                <span className="block font-bold text-emerald-800 dark:text-amber-300">Full Semester Payment</span>
+                                <span className="text-emerald-950 dark:text-white font-extrabold text-xs">₦15,000 NGN</span>
+                                <p className="text-[9px] text-slate-500 font-sans">Full payment for a semester is ₦15,000 NGN.</p>
                               </div>
-                              <div className="bg-white/40 dark:bg-emerald-950/20 p-1.5 rounded border border-emerald-100/50">
-                                <span className="block font-bold text-emerald-700 dark:text-amber-300">Monthly Payment</span>
-                                <span className="text-emerald-900 dark:text-white">₦5,000 NGN</span>
+                              <div className="bg-white dark:bg-emerald-950/60 p-2 rounded-lg border border-emerald-200 dark:border-emerald-800 space-y-0.5">
+                                <span className="block font-bold text-emerald-800 dark:text-amber-300">Installment Plan</span>
+                                <span className="text-emerald-950 dark:text-white font-extrabold text-xs">₦5,000 NGN × 3 Times</span>
+                                <p className="text-[9px] text-slate-500 font-sans">Installment payments is ₦5,000 three times.</p>
                               </div>
                             </div>
                           </div>
@@ -5774,9 +5850,9 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                     onChange={() => setTuitionPayType("semester")}
                                     className="text-emerald-750"
                                   />
-                                  <span className="font-bold text-emerald-900 dark:text-amber-100">Semester Fee</span>
+                                  <span className="font-bold text-emerald-900 dark:text-amber-100">Full Semester Fee</span>
                                 </div>
-                                <span className="text-[10px] text-emerald-650 dark:text-emerald-400 font-mono">₦15,000 NGN</span>
+                                <span className="text-[10px] text-emerald-650 dark:text-emerald-400 font-mono">₦15,000 NGN (Complete)</span>
                               </label>
 
                               <label className={`p-3 rounded-lg border cursor-pointer transition-all flex flex-col gap-1 ${
@@ -5792,9 +5868,9 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                     onChange={() => setTuitionPayType("monthly")}
                                     className="text-emerald-750"
                                   />
-                                  <span className="font-bold text-emerald-900 dark:text-amber-100">Monthly Payment</span>
+                                  <span className="font-bold text-emerald-900 dark:text-amber-100">Installment Plan</span>
                                 </div>
-                                <span className="text-[10px] text-emerald-650 dark:text-emerald-400 font-mono">₦5,000 NGN</span>
+                                <span className="text-[10px] text-emerald-650 dark:text-emerald-400 font-mono">₦5,000 NGN (1 of 3 Payments)</span>
                               </label>
                             </div>
                           </div>

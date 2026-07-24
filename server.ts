@@ -3035,22 +3035,41 @@ function findLocalIslamicAcademyAnswer(msg: string): string | null {
   ) {
     if (isYo) {
       return `${greetingPrefix}Owo ile-iwe (tuition fee) ni Abu Qoonitah Islamic Academy jẹ gẹgẹ bi a ti ṣe sọ ọ̀ lẹ́sẹẹsẹ yí:
-• **Owo Oṣooṣu (Monthly Payment)**: ₦5,000 NGN.
-• **Owo Saa Kan (Semester Tuition Fee)**: ₦15,000 NGN.
+• **Kíkún Saa Kan (Full Semester Payment)**: ₦15,000 NGN.
+• **Isanwo Nipa İpele/Àwọn İpín (Installment Payment)**: ₦5,000 NGN lẹmẹta (3 times) ni portal iteewole.
 
-Ti o ba sọ ipele (level) tabi ẹkọ pato ti o fẹ kọ, n o sọ owo ati alaye kikun fun ọ. O le fi ẹri isanwo (payment receipt) rẹ ranṣẹ lori Student Portal rẹ lati bẹrẹ ẹ̀kọ́!`;
+**Alaye Akaunti Isanwo (Account Details):**
+• **Akaunti Opay (Bank Number)**: 8122455759
+• **Orukọ Akaunti (Account Name)**: Ishaq Ridwanullah Babatunde
+• **Bank**: Opay
+
+O le fi ẹri isanwo (payment receipt) rẹ ranṣẹ lori Student Portal rẹ lati bẹrẹ ẹ̀kọ́!`;
     }
 
     const isAr = query.includes("رسوم") || query.includes("كم") || query.includes("ادفع") || query.includes("تكلفة") || query.includes("سعر");
     if (isAr) {
       return `${greetingPrefix}الرسوم الدراسية المعتمدة في أكاديمية أبو قانتة الإسلامية هي كالتالي:
-• **الرسوم الشهرية**: ٥,٠٠٠ نيرة نيجيرية (5,000 NGN).
-• **رسوم الفصل الدراسي الواحد (الترم)**: ١٥,٠٠٠ نيرة نيجيرية (15,000 NGN).
+• **الدفع الكامل للفصل الدراسي (الترم)**: ١٥,٠٠٠ نيرة نيجيرية (15,000 NGN).
+• **الدفع بالأقساط (Installment Payment)**: ٥,٠٠٠ نيرة نيجيرية (5,000 NGN) ثلاث مرات عبر بوابة التسجيل.
 
-إذا كنت مهتمًا بمستوى أو دورة معينة، يرجى إخباري بذلك حتى أتمكن من توفير كامل التفاصيل والجدول الدراسي. يمكنك تسليم إيصالات الدفع مباشرة عبر بوابة الطالب!`;
+**تفاصيل الحساب البنكي للدفع:**
+• **اسم الحساب (Account Name)**: Ishaq Ridwanullah Babatunde
+• **رقم الحساب (Bank Number)**: 8122455759
+• **اسم البنك (Bank Name)**: Opay
+
+يمكنك تسليم إيصالات الدفع مباشرة عبر بوابة التسجيل والطالب!`;
     }
 
-    return `${greetingPrefix}The tuition fee is ₦5,000 NGN for the Monthly Tuition Payment and ₦15,000 NGN for the Semester Tuition Fee. If you tell me the specific course or level you are interested in, I can also provide the exact fee and programme details.`;
+    return `${greetingPrefix}The tuition fee at Abu Qoonitah Islamic Academy is structured as follows:
+• **Full Payment for a Semester**: ₦15,000 NGN.
+• **Installment Payments**: ₦5,000 NGN (Paid 3 times in the registration portal).
+
+**Bank Account Details for Payment:**
+• **Account Name**: Ishaq Ridwanullah Babatunde
+• **Bank Number**: 8122455759
+• **Bank Name**: Opay
+
+You can upload your payment transfer receipt directly in the registration portal or student payments tab to gain instant access.`;
   }
 
   // 2. Courses & Levels Offered
@@ -3335,10 +3354,13 @@ app.post("/api/chat", async (req, res) => {
     - Do not simply repeat the user's greeting back to them.
     - If the user says hello, hi, good morning, or another normal greeting, respond naturally and politely.
 
-    TUITION FEES INFORMATION:
-    - Monthly Tuition Payment: ₦5,000 NGN.
-    - Semester Tuition Fee: ₦15,000 NGN.
-    - If asked about fees ("How much is the tuition fee.", "How much is the school fee.", "How much do I need to pay.", "What is the fee.", "How much does the course cost.", "How much is the semester fee."), answer directly using the above information.
+    TUITION FEES & BANK ACCOUNT INFORMATION:
+    - Full Payment for a Semester: ₦15,000 NGN.
+    - Installment Payments: ₦5,000 NGN paid 3 times in the registration portal.
+    - Account Name: Ishaq Ridwanullah Babatunde
+    - Bank Number: 8122455759
+    - Bank Name: Opay
+    - If asked about fees ("How much is the tuition fee.", "How much is the school fee.", "How much do I need to pay.", "What is the fee.", "How much does the course cost.", "How much is the semester fee.", "What are the bank account details"), answer directly using the above information.
     - If the user does not specify a course or level and there are multiple fees, explain both options and ask which course or level they are interested in.
 
     ACADEMY COURSES & INFORMATION:
