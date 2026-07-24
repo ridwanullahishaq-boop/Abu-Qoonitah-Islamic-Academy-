@@ -1291,7 +1291,17 @@ Please keep this secure.`;
         onLoginSuccess(data.user, token);
         // Re-request courses to update stats
         setCourses(courses.map(c => c.id === courseId ? { ...c, enrolledStudentsCount: (c.enrolledStudentsCount || 0) + 1 } : c));
-        alert("Barakallahu Feekum! Successfully enrolled in the course. Start studying now.");
+        alert(
+          `Barakallahu Feekum! Successfully enrolled in the course.\n\n` +
+          `💳 SEMESTER TUITION RATES:\n` +
+          `• Full payment for a semester is ₦15,000 NGN.\n` +
+          `• Installment payments is ₦5,000 NGN three times.\n\n` +
+          `🏦 BANK TRANSFER DETAILS:\n` +
+          `• Account Name: Ishaq Ridwanullah Babatunde\n` +
+          `• Bank Number: 8122455759\n` +
+          `• Bank Name: Opay\n\n` +
+          `You can upload your payment receipt in the 'Payments & Clearances' tab to unlock full semester access!`
+        );
       })
       .catch((err) => alert(`Enrolment Error: ${err.message}`));
   };
