@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { User, Course, Submission, Announcement, SchoolCalendarEvent, DiscussionMessage, DirectMessage, AppNotification } from "../types";
 import {
-  BookOpen, Users, Video, FileText, CheckCircle2, AlertTriangle, Send, Mail, Key, Shield, UserPlus,
+  BookOpen, Users, Video, FileText, CheckCircle2, AlertTriangle, Send, Mail, Key, Shield, UserPlus, UserCheck,
   ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff
 } from "lucide-react";
 
@@ -333,6 +333,21 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [credNewPassword, setCredNewPassword] = useState("");
   const [credNewUsername, setCredNewUsername] = useState("");
 
+  // Admin Level & Teacher Allocation states
+  const [allocSearch, setAllocSearch] = useState("");
+  const [allocRoleFilter, setAllocRoleFilter] = useState<"all" | "teachers" | "students">("all");
+  const [allocSavingId, setAllocSavingId] = useState<string | null>(null);
+  const [allocSuccessMsg, setAllocSuccessMsg] = useState("");
+  const [allocErrorMsg, setAllocErrorMsg] = useState("");
+  const [teacherLevelMap, setTeacherLevelMap] = useState<Record<string, string>>({});
+  const [studentLevelMap, setStudentLevelMap] = useState<Record<string, string>>({});
+  const [studentTeacherMap, setStudentTeacherMap] = useState<Record<string, string>>({});
+  const [studentAccessMap, setStudentAccessMap] = useState<Record<string, boolean>>({});
+
+  // Role simulation state for seamlessly viewing Student, Teacher, and Admin portals
+  const [simulatedRole, setSimulatedRole] = useState<"admin" | "teacher" | "student" | null>(null);
+  const effectiveRole = simulatedRole || currentUser?.role;
+
   // Student Payment submission states
   const [payMonth, setPayMonth] = useState("July 2026");
   const [payAmount, setPayAmount] = useState("₦15,000 / $25");
@@ -583,7 +598,7 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
         .catch((err) => console.error(err));
 
       // Load rosters if teacher or admin
-      if (currentUser.role === "admin" || currentUser.role === "teacher") {
+      if (currentUser.role === "admin" || currentUser.role === "teacher" || effectiveRole === "admin" || effectiveRole === "teacher") {
         fetch("/api/admin/students", { headers })
           .then((res) => res.json())
           .then((data) => {
@@ -2100,6 +2115,116 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
       });
   };
 
+  // Handle updating a Teacher's allocated class level
+  const handleSaveTeacherLevel = async (teacherId: string, assignedClass: string) => {
+    setAllocSavingId(teacherId);
+    setAllocSuccessMsg("");
+    setAllocErrorMsg("");
+    const token = localStorage.getItem("token");
+
+    try {
+      const res = await fetch(`/api/admin/teachers/${teacherId}/update`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ assignedClass })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update teacher level.");
+
+      // Update local states
+      setAllTeachers(prev => prev.map(t => t.id === teacherId ? { ...t, assignedClass } : t));
+      setAdmissionList(prev => prev.map(item => item.id === teacherId ? { ...item, level: assignedClass, assignedClass } : item));
+      setAllocSuccessMsg(`🎉 Teacher level allocated to "${assignedClass.toUpperCase()}" successfully!`);
+      setTimeout(() => setAllocSuccessMsg(""), 4000);
+    } catch (err: any) {
+      setAllocErrorMsg(err.message || "Failed to save teacher allocation.");
+      setTimeout(() => setAllocErrorMsg(""), 4000);
+    } finally {
+      setAllocSavingId(null);
+    }
+  };
+
+  // Handle updating a Student's academic level, assigned teacher, and portal access status
+  const handleSaveStudentAllocation = async (studentId: string, level: string, teacherId: string, isPaid?: boolean) => {
+    setAllocSavingId(studentId);
+    setAllocSuccessMsg("");
+    setAllocErrorMsg("");
+    const token = localStorage.getItem("token");
+
+    // Find teacher name from allTeachers
+    const selectedTeacher = allTeachers.find(t => t.id === teacherId || t.name === teacherId);
+    const teacherName = selectedTeacher ? selectedTeacher.name : (teacherId || "");
+
+    const student = allStudents.find(s => s.id === studentId);
+    const targetIsPaid = isPaid !== undefined ? isPaid : (student ? student.isPaid !== false : true);
+
+    try {
+      const res = await fetch(`/api/admin/students/${studentId}/update-credentials`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          level,
+          teacherId,
+          teacherName,
+          assignedTeacherName: teacherName,
+          isPaid: targetIsPaid
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update student allocation.");
+
+      // Update local states
+      setAllStudents(prev => prev.map(s => s.id === studentId ? { ...s, level, teacherId, teacherName, assignedTeacherName: teacherName, isPaid: targetIsPaid } : s));
+      setAdmissionList(prev => prev.map(item => item.id === studentId ? { ...item, level, teacherId, teacherName, isPaid: targetIsPaid } : item));
+      setAllocSuccessMsg(`🎉 Student level set to "${level.toUpperCase()}" and assigned to "${teacherName || 'Faculty'}" successfully!`);
+      setTimeout(() => setAllocSuccessMsg(""), 4000);
+    } catch (err: any) {
+      setAllocErrorMsg(err.message || "Failed to save student allocation.");
+      setTimeout(() => setAllocErrorMsg(""), 4000);
+    } finally {
+      setAllocSavingId(null);
+    }
+  };
+
+  // Handle Bulk Unlocking Portal Access for all students
+  const handleBulkUnlockStudents = async () => {
+    setAllocSavingId("bulk-unlock");
+    setAllocSuccessMsg("");
+    setAllocErrorMsg("");
+    const token = localStorage.getItem("token");
+
+    let unlockedCount = 0;
+    try {
+      const lockedStudents = allStudents.filter(s => s.isPaid === false);
+      for (const student of lockedStudents) {
+        await fetch(`/api/admin/students/${student.id}/update-credentials`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ isPaid: true })
+        });
+        unlockedCount++;
+      }
+      setAllStudents(prev => prev.map(s => ({ ...s, isPaid: true })));
+      setAdmissionList(prev => prev.map(item => ({ ...item, isPaid: true })));
+      setAllocSuccessMsg(`🎉 Successfully unlocked portal access for ${unlockedCount > 0 ? unlockedCount : 'all'} students!`);
+      setTimeout(() => setAllocSuccessMsg(""), 4000);
+    } catch (err: any) {
+      setAllocErrorMsg("Error unlocking portal access: " + err.message);
+      setTimeout(() => setAllocErrorMsg(""), 4000);
+    } finally {
+      setAllocSavingId(null);
+    }
+  };
+
   const handleSaveAboutUs = (e: React.FormEvent) => {
     e.preventDefault();
     setAboutUsSaving(true);
@@ -3404,14 +3529,111 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               New Student? Admissions Registration
             </button>
 
-            {/* Quick Helper Credentials Banner for Dev */}
-            <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded border border-emerald-250 dark:border-emerald-800 text-[10px] text-emerald-800 dark:text-emerald-300 space-y-1">
-              <span className="font-bold">Demonstration Credentials:</span>
-              <div className="grid grid-cols-2 gap-1 font-mono">
-                <div>Admin:</div><div>Admin / Ridwanullah@123</div>
-                <div>Teacher:</div><div>Teacher / Teacher@123</div>
-                <div>Student (Unpaid):</div><div>LockedStudent / Student@123</div>
-                <div>Student (Paid):</div><div>Student / Student@123</div>
+            {/* 1-Click Direct Portal Access Buttons */}
+            <div className="pt-2 border-t border-emerald-100 dark:border-emerald-800/60 space-y-2">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-emerald-300 block text-center uppercase tracking-wider">
+                ⚡ 1-Click Direct Portal Login
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsername("Student");
+                    setPassword("Student@123");
+                    fetch("/api/auth/login", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ username: "Student", password: "Student@123" })
+                    })
+                      .then((res) => res.json())
+                      .then((data) => {
+                        if (data.token) {
+                          localStorage.setItem("token", data.token);
+                          onLoginSuccess(data.user, data.token);
+                        }
+                      })
+                      .catch(() => {});
+                  }}
+                  className="p-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-left text-xs font-bold transition-all shadow-xs cursor-pointer flex flex-col justify-between"
+                >
+                  <span className="flex items-center gap-1"><BookOpen className="w-3.5 h-3.5 text-natural-gold shrink-0" /> Student Portal</span>
+                  <span className="text-[9px] font-normal opacity-90 mt-1">Zayd Mansoor (Unlocked)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsername("Teacher");
+                    setPassword("Teacher@123");
+                    fetch("/api/auth/login", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ username: "Teacher", password: "Teacher@123" })
+                    })
+                      .then((res) => res.json())
+                      .then((data) => {
+                        if (data.token) {
+                          localStorage.setItem("token", data.token);
+                          onLoginSuccess(data.user, data.token);
+                        }
+                      })
+                      .catch(() => {});
+                  }}
+                  className="p-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-left text-xs font-bold transition-all shadow-xs cursor-pointer flex flex-col justify-between"
+                >
+                  <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-amber-200 shrink-0" /> Teacher Portal</span>
+                  <span className="text-[9px] font-normal opacity-90 mt-1">Shaykh Ahmed Al-Misri</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsername("Admin");
+                    setPassword("Ridwanullah@123");
+                    fetch("/api/auth/login", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ username: "Admin", password: "Ridwanullah@123" })
+                    })
+                      .then((res) => res.json())
+                      .then((data) => {
+                        if (data.token) {
+                          localStorage.setItem("token", data.token);
+                          onLoginSuccess(data.user, data.token);
+                        }
+                      })
+                      .catch(() => {});
+                  }}
+                  className="p-2.5 bg-emerald-950 hover:bg-black text-amber-300 border border-amber-500/40 rounded-xl text-left text-xs font-bold transition-all shadow-xs cursor-pointer flex flex-col justify-between"
+                >
+                  <span className="flex items-center gap-1"><Shield className="w-3.5 h-3.5 text-natural-gold shrink-0" /> Admin Portal</span>
+                  <span className="text-[9px] font-normal opacity-90 mt-1">Ustadh Abu Qoonitah</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsername("LockedStudent");
+                    setPassword("Student@123");
+                    fetch("/api/auth/login", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ username: "LockedStudent", password: "Student@123" })
+                    })
+                      .then((res) => res.json())
+                      .then((data) => {
+                        if (data.token) {
+                          localStorage.setItem("token", data.token);
+                          onLoginSuccess(data.user, data.token);
+                        }
+                      })
+                      .catch(() => {});
+                  }}
+                  className="p-2.5 bg-slate-700 hover:bg-slate-800 text-slate-100 rounded-xl text-left text-xs font-bold transition-all shadow-xs cursor-pointer flex flex-col justify-between"
+                >
+                  <span className="flex items-center gap-1"><Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Unpaid Student</span>
+                  <span className="text-[9px] font-normal opacity-90 mt-1">Sumayyah (Locked)</span>
+                </button>
               </div>
             </div>
           </form>
@@ -3458,6 +3680,12 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setAdminSubTab("allocation")}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-emerald-950 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+            >
+              🎯 Level & Teacher Allocation Hub
+            </button>
             <button
               onClick={() => setShowAllPasswords(!showAllPasswords)}
               className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-emerald-800/60 dark:hover:bg-emerald-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
@@ -3769,15 +3997,15 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
             <div>
               <h3 className="font-serif font-bold text-sm sm:text-base text-natural-green dark:text-white">{currentUser.name}</h3>
               <p className="text-[10px] uppercase tracking-widest text-natural-gold font-mono">
-                {currentUser.role} Account
+                {effectiveRole} Mode ({currentUser.role} Account)
               </p>
-              {currentUser.role === "student" && (
+              {effectiveRole === "student" && (
                 <div className="mt-2 space-y-1">
                   <span className="inline-block text-[9px] font-bold bg-natural-sage/20 dark:bg-natural-green/45 text-natural-green dark:text-emerald-200 px-2 py-0.5 rounded-full uppercase">
-                    Level: {currentUser.level}
+                    Level: {currentUser.level || "beginner"}
                   </span>
                   <div>
-                    {currentUser.isPaid ? (
+                    {currentUser.isPaid !== false ? (
                       <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-natural-green">
                         <Unlock className="w-3 h-3 text-natural-gold" /> Unlocked Student
                       </span>
@@ -3789,6 +4017,48 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Portal Role View Switcher */}
+            <div className="p-2.5 bg-emerald-50/60 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 space-y-2">
+              <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
+                ⚡ Portal View Mode
+              </span>
+              <div className="grid grid-cols-3 gap-1">
+                <button
+                  type="button"
+                  onClick={() => { setSimulatedRole("student"); setActiveTab("dashboard"); }}
+                  className={`py-1.5 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                    effectiveRole === "student"
+                      ? "bg-emerald-700 text-white shadow-xs"
+                      : "bg-white dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100"
+                  }`}
+                >
+                  🎓 Student
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSimulatedRole("teacher"); setActiveTab("dashboard"); }}
+                  className={`py-1.5 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                    effectiveRole === "teacher"
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "bg-white dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100"
+                  }`}
+                >
+                  👨‍🏫 Teacher
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSimulatedRole("admin"); setActiveTab("dashboard"); }}
+                  className={`py-1.5 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+                    effectiveRole === "admin"
+                      ? "bg-emerald-950 text-amber-300 border border-amber-500/40 shadow-xs"
+                      : "bg-white dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100"
+                  }`}
+                >
+                  👑 Admin
+                </button>
+              </div>
             </div>
 
             {/* Notification Bell Header Button */}
@@ -4283,7 +4553,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
           {activeTab === "dashboard" && (
             <>
               {/* === A. STUDENT PORTAL WORKSPACE === */}
-              {currentUser.role === "student" && (
+              {effectiveRole === "student" && (
                 <div className="space-y-6 animate-fade-in">
                   
                   {/* Student Sub-tab Navigation Pills */}
@@ -4485,7 +4755,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               <button
                                 onClick={() => {
                                   setActiveTab("messages");
-                                  setSelectedRecipient(assignedTch);
+                                  setActiveContact(assignedTch);
                                 }}
                                 className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-2 cursor-pointer transition-all"
                               >
@@ -5846,7 +6116,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               )}
 
               {/* === B. TEACHER PORTAL WORKSPACE === */}
-              {currentUser.role === "teacher" && (
+              {effectiveRole === "teacher" && (
                 <div className="space-y-6 animate-fade-in font-sans">
                   
                   {/* Teacher Sub-tab Navigation Pills */}
@@ -6008,7 +6278,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                       <button
                                         onClick={() => {
                                           setActiveTab("messages");
-                                          setSelectedRecipient(st);
+                                          setActiveContact(st);
                                         }}
                                         className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1"
                                       >
@@ -8153,7 +8423,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               )}
 
               {/* === C. ADMIN DASHBOARD WORKSPACE === */}
-              {currentUser.role === "admin" && (
+              {effectiveRole === "admin" && (
                 <div className="space-y-8 animate-fade-in">
                   
                   {/* Admin Navigation Pills */}
@@ -8167,6 +8437,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       }`}
                     >
                       💳 Payments & Clearances
+                    </button>
+                    <button
+                      onClick={() => setAdminSubTab("allocation")}
+                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                        adminSubTab === "allocation"
+                          ? "bg-emerald-700 text-white shadow"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                      }`}
+                    >
+                      <span>🎯 Level & Teacher Allocation</span>
                     </button>
                     <button
                       onClick={() => setAdminSubTab("announcements")}
@@ -10920,6 +11200,360 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           {tchLoading ? "⚙️ Processing Registration..." : "👨‍🏫 Register Teacher & Create Account"}
                         </button>
                       </form>
+                    </div>
+                  )}
+
+                  {/* SUB-TAB 15: LEVEL & TEACHER ALLOCATION HUB */}
+                  {adminSubTab === "allocation" && (
+                    <div className="bg-white dark:bg-emerald-900 rounded-xl p-6 sm:p-8 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-6 font-sans">
+                      
+                      {/* Header */}
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-emerald-50/50 dark:bg-emerald-950/40 p-5 rounded-2xl border border-emerald-200/80 dark:border-emerald-800">
+                        <div>
+                          <h3 className="text-lg font-serif font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2">
+                            <span>🎯 Level & Teacher Allocation Management Hub</span>
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-300 mt-1 leading-relaxed">
+                            Allocate registered Ustadhs/Teachers to specific academic levels (Beginner, Intermediate, Advanced, or All Levels), place registered students into their appropriate academic levels, assign dedicated Ustadhs to students, and toggle portal access.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleBulkUnlockStudents}
+                          disabled={allocSavingId === "bulk-unlock"}
+                          className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold text-xs rounded-xl shadow cursor-pointer transition-all shrink-0 flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          <Unlock className="w-4 h-4" />
+                          <span>{allocSavingId === "bulk-unlock" ? "Processing Unlocks..." : "🔓 Bulk Unlock All Student Portals"}</span>
+                        </button>
+                      </div>
+
+                      {/* Toast Messages */}
+                      {allocSuccessMsg && (
+                        <div className="p-4 rounded-xl text-xs font-bold bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 animate-fade-in flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>{allocSuccessMsg}</span>
+                        </div>
+                      )}
+                      {allocErrorMsg && (
+                        <div className="p-4 rounded-xl text-xs font-bold bg-red-50 dark:bg-red-950/80 text-red-800 dark:text-red-200 border border-red-300 dark:border-red-700 animate-fade-in flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                          <span>{allocErrorMsg}</span>
+                        </div>
+                      )}
+
+                      {/* Overview Metric Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Teachers Card */}
+                        <div className="p-4 bg-amber-50/50 dark:bg-emerald-950/30 rounded-2xl border border-amber-200/60 dark:border-emerald-800 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Registered Ustadhs</span>
+                            <span className="text-xl font-serif font-bold text-amber-900 dark:text-amber-100">{allTeachers.length}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300 flex-wrap pt-1 border-t border-amber-200/40 dark:border-emerald-800/40">
+                            <span className="bg-emerald-100 dark:bg-emerald-800/60 px-2 py-0.5 rounded font-bold text-emerald-900 dark:text-emerald-100">
+                              Beginner: {allTeachers.filter(t => t.assignedClass === 'beginner').length}
+                            </span>
+                            <span className="bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded font-bold text-amber-900 dark:text-amber-100">
+                              Intermediate: {allTeachers.filter(t => t.assignedClass === 'intermediate').length}
+                            </span>
+                            <span className="bg-emerald-900/10 dark:bg-emerald-900 px-2 py-0.5 rounded font-bold text-emerald-950 dark:text-amber-200">
+                              Advanced: {allTeachers.filter(t => t.assignedClass === 'advanced').length}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Students Card */}
+                        <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-2xl border border-emerald-200/60 dark:border-emerald-800 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">Registered Students</span>
+                            <span className="text-xl font-serif font-bold text-emerald-900 dark:text-emerald-100">{allStudents.length}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300 flex-wrap pt-1 border-t border-emerald-200/40 dark:border-emerald-800/40">
+                            <span className="bg-emerald-100 dark:bg-emerald-800/60 px-2 py-0.5 rounded font-bold text-emerald-900 dark:text-emerald-100">
+                              Beginner: {allStudents.filter(s => (s.level || 'beginner') === 'beginner').length}
+                            </span>
+                            <span className="bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded font-bold text-amber-900 dark:text-amber-100">
+                              Intermediate: {allStudents.filter(s => s.level === 'intermediate').length}
+                            </span>
+                            <span className="bg-emerald-900/10 dark:bg-emerald-900 px-2 py-0.5 rounded font-bold text-emerald-950 dark:text-amber-200">
+                              Advanced: {allStudents.filter(s => s.level === 'advanced').length}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Access Status Card */}
+                        <div className="p-4 bg-slate-50 dark:bg-emerald-950/30 rounded-2xl border border-slate-200 dark:border-emerald-800 space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Portal Access Status</span>
+                            <span className="text-xl font-serif font-bold text-emerald-800 dark:text-amber-300">
+                              {allStudents.filter(s => s.isPaid !== false).length} / {allStudents.length} Unlocked
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200 dark:border-emerald-800/40 flex items-center justify-between">
+                            <span>Students can access courses & faculty when unlocked.</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Filter Bar */}
+                      <div className="flex flex-col md:flex-row justify-between items-center gap-3">
+                        <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-emerald-950/45 p-1 rounded-xl border border-slate-200/50 dark:border-emerald-800/40 w-full md:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => setAllocRoleFilter("all")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              allocRoleFilter === "all"
+                                ? "bg-white dark:bg-emerald-800 text-emerald-950 dark:text-white shadow-xs"
+                                : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                            }`}
+                          >
+                            All Roster ({allTeachers.length + allStudents.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAllocRoleFilter("teachers")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              allocRoleFilter === "teachers"
+                                ? "bg-white dark:bg-emerald-800 text-emerald-950 dark:text-white shadow-xs"
+                                : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                            }`}
+                          >
+                            👨‍🏫 Registered Teachers ({allTeachers.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAllocRoleFilter("students")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              allocRoleFilter === "students"
+                                ? "bg-white dark:bg-emerald-800 text-emerald-950 dark:text-white shadow-xs"
+                                : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                            }`}
+                          >
+                            🎓 Registered Students ({allStudents.length})
+                          </button>
+                        </div>
+
+                        <div className="w-full md:w-64">
+                          <input
+                            type="text"
+                            placeholder="Search name, email, or username..."
+                            value={allocSearch}
+                            onChange={(e) => setAllocSearch(e.target.value)}
+                            className="w-full bg-white dark:bg-emerald-950/40 border border-slate-200 dark:border-emerald-800 p-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-600 dark:text-white font-sans"
+                          />
+                        </div>
+                      </div>
+
+                      {/* SECTION 1: REGISTERED TEACHERS LEVEL ALLOCATION */}
+                      {(allocRoleFilter === "all" || allocRoleFilter === "teachers") && (
+                        <div className="space-y-4 pt-2">
+                          <div className="flex justify-between items-center border-b border-emerald-100 dark:border-emerald-800 pb-2">
+                            <h4 className="font-serif font-bold text-emerald-950 dark:text-amber-100 text-base flex items-center gap-2">
+                              <span>👨‍🏫 Registered Teachers & Level Allocation</span>
+                            </h4>
+                            <span className="text-xs text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                              {allTeachers.length} Active Instructors
+                            </span>
+                          </div>
+
+                          <div className="bg-white dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-800 overflow-hidden shadow-xs">
+                            <div className="overflow-x-auto text-xs">
+                              <table className="w-full text-left border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-50 dark:bg-emerald-950 border-b border-emerald-100 dark:border-emerald-800 text-emerald-950 dark:text-amber-100 font-bold uppercase tracking-wider text-[10px]">
+                                    <th className="p-3.5 pl-4">Ustadh Name & Contact</th>
+                                    <th className="p-3.5">Qualifications & Subjects</th>
+                                    <th className="p-3.5">Allocated Class Level</th>
+                                    <th className="p-3.5">Assigned Students</th>
+                                    <th className="p-3.5 pr-4 text-right">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-50/15">
+                                  {allTeachers
+                                    .filter(t => 
+                                      !allocSearch || 
+                                      t.name.toLowerCase().includes(allocSearch.toLowerCase()) || 
+                                      t.email.toLowerCase().includes(allocSearch.toLowerCase()) || 
+                                      t.username.toLowerCase().includes(allocSearch.toLowerCase())
+                                    )
+                                    .map((teacher) => {
+                                      const currentVal = teacherLevelMap[teacher.id] ?? (teacher.assignedClass || "beginner");
+                                      const assignedStudentsCount = allStudents.filter(s => 
+                                        s.teacherId === teacher.id || 
+                                        s.teacherName === teacher.name || 
+                                        s.assignedTeacherName === teacher.name || 
+                                        (teacher.assignedClass && teacher.assignedClass !== 'all' && s.level === teacher.assignedClass)
+                                      ).length;
+
+                                      return (
+                                        <tr key={teacher.id} className="hover:bg-slate-50/50 dark:hover:bg-emerald-850/20 transition-colors">
+                                          <td className="p-3.5 pl-4">
+                                            <div className="font-bold text-emerald-950 dark:text-amber-100">{teacher.name}</div>
+                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{teacher.email} • @{teacher.username}</div>
+                                          </td>
+                                          <td className="p-3.5">
+                                            <div className="font-semibold text-slate-700 dark:text-slate-200">{teacher.qualification || "Faculty Member"}</div>
+                                            <div className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-0.5">{teacher.subjects || "Islamic Studies & Tajweed"}</div>
+                                          </td>
+                                          <td className="p-3.5">
+                                            <select
+                                              value={currentVal}
+                                              onChange={(e) => setTeacherLevelMap({ ...teacherLevelMap, [teacher.id]: e.target.value })}
+                                              className="bg-emerald-50/60 dark:bg-emerald-900 border border-emerald-200 dark:border-emerald-700 rounded-lg p-2 text-xs font-bold text-emerald-950 dark:text-amber-100 focus:ring-1 focus:ring-emerald-600 cursor-pointer"
+                                            >
+                                              <option value="beginner">🟢 Beginner Level (I'daadiy)</option>
+                                              <option value="intermediate">🟡 Intermediate Level (Mutawassit)</option>
+                                              <option value="advanced">🔴 Advanced Level (Thaanawiy)</option>
+                                              <option value="all">🌐 All Academic Levels (Senior Ustadh)</option>
+                                            </select>
+                                          </td>
+                                          <td className="p-3.5">
+                                            <span className="px-2.5 py-1 bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 rounded-full font-bold text-[10px]">
+                                              {assignedStudentsCount} Students
+                                            </span>
+                                          </td>
+                                          <td className="p-3.5 pr-4 text-right">
+                                            <button
+                                              type="button"
+                                              disabled={allocSavingId === teacher.id}
+                                              onClick={() => handleSaveTeacherLevel(teacher.id, currentVal)}
+                                              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer transition-all disabled:opacity-50"
+                                            >
+                                              {allocSavingId === teacher.id ? "Saving..." : "Save Level"}
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  {allTeachers.length === 0 && (
+                                    <tr>
+                                      <td colSpan={5} className="p-8 text-center text-slate-400 italic">No registered teachers found.</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SECTION 2: REGISTERED STUDENTS LEVEL & TEACHER ALLOCATION */}
+                      {(allocRoleFilter === "all" || allocRoleFilter === "students") && (
+                        <div className="space-y-4 pt-4 border-t border-emerald-100 dark:border-emerald-800">
+                          <div className="flex justify-between items-center border-b border-emerald-100 dark:border-emerald-800 pb-2">
+                            <h4 className="font-serif font-bold text-emerald-950 dark:text-amber-100 text-base flex items-center gap-2">
+                              <span>🎓 Registered Students Level & Teacher Allocation</span>
+                            </h4>
+                            <span className="text-xs text-amber-700 dark:text-amber-300 font-bold bg-amber-50 dark:bg-emerald-950 px-2.5 py-1 rounded-full border border-amber-200 dark:border-emerald-800">
+                              {allStudents.length} Registered Students
+                            </span>
+                          </div>
+
+                          <div className="bg-white dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-800 overflow-hidden shadow-xs">
+                            <div className="overflow-x-auto text-xs">
+                              <table className="w-full text-left border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-50 dark:bg-emerald-950 border-b border-emerald-100 dark:border-emerald-800 text-emerald-950 dark:text-amber-100 font-bold uppercase tracking-wider text-[10px]">
+                                    <th className="p-3.5 pl-4">Student Profile</th>
+                                    <th className="p-3.5">Academic Level Track</th>
+                                    <th className="p-3.5">Allocated Ustadh/Teacher</th>
+                                    <th className="p-3.5">Portal Access</th>
+                                    <th className="p-3.5 pr-4 text-right">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-50/15">
+                                  {allStudents
+                                    .filter(s => 
+                                      !allocSearch || 
+                                      s.name.toLowerCase().includes(allocSearch.toLowerCase()) || 
+                                      s.email.toLowerCase().includes(allocSearch.toLowerCase()) || 
+                                      s.username.toLowerCase().includes(allocSearch.toLowerCase())
+                                    )
+                                    .map((student) => {
+                                      const currentLevel = studentLevelMap[student.id] ?? (student.level || "beginner");
+                                      const currentTeacherId = studentTeacherMap[student.id] ?? (student.teacherId || student.teacherName || "");
+                                      const currentAccess = studentAccessMap[student.id] ?? (student.isPaid !== false);
+
+                                      return (
+                                        <tr key={student.id} className="hover:bg-slate-50/50 dark:hover:bg-emerald-850/20 transition-colors">
+                                          <td className="p-3.5 pl-4">
+                                            <div className="font-bold text-emerald-950 dark:text-amber-100">{student.name}</div>
+                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{student.email} • @{student.username}</div>
+                                          </td>
+                                          <td className="p-3.5">
+                                            <select
+                                              value={currentLevel}
+                                              onChange={(e) => setStudentLevelMap({ ...studentLevelMap, [student.id]: e.target.value })}
+                                              className="bg-emerald-50/60 dark:bg-emerald-900 border border-emerald-200 dark:border-emerald-700 rounded-lg p-2 text-xs font-bold text-emerald-950 dark:text-amber-100 focus:ring-1 focus:ring-emerald-600 cursor-pointer capitalize"
+                                            >
+                                              <option value="beginner">🟢 Beginner (I'daadiy)</option>
+                                              <option value="intermediate">🟡 Intermediate (Mutawassit)</option>
+                                              <option value="advanced">🔴 Advanced (Thaanawiy)</option>
+                                            </select>
+                                          </td>
+                                          <td className="p-3.5">
+                                            <select
+                                              value={currentTeacherId}
+                                              onChange={(e) => setStudentTeacherMap({ ...studentTeacherMap, [student.id]: e.target.value })}
+                                              className="bg-emerald-50/60 dark:bg-emerald-900 border border-emerald-200 dark:border-emerald-700 rounded-lg p-2 text-xs font-bold text-emerald-950 dark:text-amber-100 focus:ring-1 focus:ring-emerald-600 cursor-pointer"
+                                            >
+                                              <option value="">-- Auto Faculty Assignment --</option>
+                                              {allTeachers.map((tch) => (
+                                                <option key={tch.id} value={tch.id}>
+                                                  Ustadh {tch.name} ({(tch.assignedClass || 'all').toUpperCase()})
+                                                </option>
+                                              ))}
+                                            </select>
+                                          </td>
+                                          <td className="p-3.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => setStudentAccessMap({ ...studentAccessMap, [student.id]: !currentAccess })}
+                                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1 ${
+                                                currentAccess
+                                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-200"
+                                                  : "bg-red-100 text-red-800 border border-red-200 dark:bg-red-950/60 dark:text-red-300"
+                                              }`}
+                                            >
+                                              {currentAccess ? (
+                                                <>
+                                                  <Unlock className="w-3 h-3 text-emerald-600" />
+                                                  <span>Unlocked Portal</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Lock className="w-3 h-3 text-red-600" />
+                                                  <span>Locked Portal</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </td>
+                                          <td className="p-3.5 pr-4 text-right">
+                                            <button
+                                              type="button"
+                                              disabled={allocSavingId === student.id}
+                                              onClick={() => handleSaveStudentAllocation(student.id, currentLevel, currentTeacherId, currentAccess)}
+                                              className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer transition-all disabled:opacity-50"
+                                            >
+                                              {allocSavingId === student.id ? "Saving..." : "Save Allocation"}
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  {allStudents.length === 0 && (
+                                    <tr>
+                                      <td colSpan={5} className="p-8 text-center text-slate-400 italic">No registered students found.</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                     </div>
                   )}
                 </div>
