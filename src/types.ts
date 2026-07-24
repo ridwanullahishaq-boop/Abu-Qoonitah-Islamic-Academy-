@@ -197,3 +197,18 @@ export interface Testimonial {
   rating: number;
   avatarUrl?: string;
 }
+
+export interface AppNotification {
+  id: string;
+  recipientId: string; // 'admin' or user ID or 'teachers' or 'all'
+  recipientRole?: 'admin' | 'teacher' | 'student';
+  title: string;
+  message: string;
+  type: 'message' | 'assignment' | 'free_course' | 'enrollment';
+  linkTab?: string;
+  createdAt: string;
+  read: boolean;
+  fromName?: string;
+  fromRole?: string;
+}
+

@@ -396,6 +396,22 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
     if (!user.enrolledCourses.includes(courseId)) {
       user.enrolledCourses.push(courseId);
       course.enrolledStudentsCount = (course.enrolledStudentsCount || 0) + 1;
+
+      if (!clientDb.notifications) clientDb.notifications = [];
+      clientDb.notifications.unshift({
+        id: generateId("notif"),
+        recipientId: "admin",
+        recipientRole: "admin",
+        title: `📚 New Course Enrollment`,
+        message: `Student "${user.name}" enrolled into course "${course.title}".`,
+        type: "enrollment",
+        linkTab: "admissions",
+        createdAt: new Date().toISOString(),
+        read: false,
+        fromName: user.name,
+        fromRole: user.role
+      });
+
       await saveDbToSupabase();
     }
     return mockResponse({ success: true, user });
@@ -404,7 +420,7 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
   if (path === "/api/submissions/submit" && method === "POST") {
     const user = getAuthorizedUser() as any;
     if (!user) return mockResponse({ error: "Unauthorized" }, 401);
-    const { courseId, assignmentId, fileUrl, comments } = body || {};
+    const { courseId, assignmentId, fileUrl, comments, referenceTitle } = body || {};
 
     const newSubmission = {
       id: generateId("sub"),
@@ -422,6 +438,38 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
 
     if (!clientDb.submissions) clientDb.submissions = [];
     clientDb.submissions.push(newSubmission);
+
+    if (!clientDb.notifications) clientDb.notifications = [];
+    clientDb.notifications.unshift({
+      id: generateId("notif"),
+      recipientId: "admin",
+      recipientRole: "admin",
+      title: `📝 Assignment Submitted by ${user.name}`,
+      message: `Student ${user.name} submitted an assignment "${referenceTitle || 'Assignment'}".`,
+      type: "assignment",
+      linkTab: "grading",
+      createdAt: new Date().toISOString(),
+      read: false,
+      fromName: user.name,
+      fromRole: user.role
+    });
+
+    if (user.teacherId) {
+      clientDb.notifications.unshift({
+        id: generateId("notif"),
+        recipientId: user.teacherId,
+        recipientRole: "teacher",
+        title: `📝 Assignment Submitted by ${user.name}`,
+        message: `Your student ${user.name} submitted an assignment "${referenceTitle || 'Assignment'}".`,
+        type: "assignment",
+        linkTab: "grading",
+        createdAt: new Date().toISOString(),
+        read: false,
+        fromName: user.name,
+        fromRole: user.role
+      });
+    }
+
     await saveDbToSupabase();
     return mockResponse({ success: true, submission: newSubmission });
   }
@@ -548,22 +596,94 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
     return mockResponse(chatHistory);
   }
 
+  // --- NOTIFICATION ENDPOINTS ---
+  if (path === "/api/notifications" && method === "GET") {
+    const user = getAuthorizedUser() as any;
+    if (!user) return mockResponse([]);
+    const allNotifs = clientDb.notifications || [];
+    const userNotifs = allNotifs.filter((n: any) => {
+      if (n.recipientId === user.id) return true;
+      if (n.recipientId === "all") return true;
+      if (user.role === "admin" && (n.recipientId === "admin" || n.recipientRole === "admin")) return true;
+      if (user.role === "teacher" && (n.recipientId === "teachers" || n.recipientRole === "teacher")) return true;
+      return false;
+    });
+    return mockResponse(userNotifs);
+  }
+
+  if (path === "/api/notifications/read" && method === "POST") {
+    const user = getAuthorizedUser() as any;
+    const { id, all } = body || {};
+    if (!clientDb.notifications) clientDb.notifications = [];
+    if (all) {
+      clientDb.notifications.forEach((n: any) => {
+        if (
+          n.recipientId === user?.id ||
+          n.recipientId === "all" ||
+          (user?.role === "admin" && (n.recipientId === "admin" || n.recipientRole === "admin")) ||
+          (user?.role === "teacher" && (n.recipientId === "teachers" || n.recipientRole === "teacher"))
+        ) {
+          n.read = true;
+        }
+      });
+    } else if (id) {
+      const notif = clientDb.notifications.find((n: any) => n.id === id);
+      if (notif) notif.read = true;
+    }
+    await saveDbToSupabase();
+    return mockResponse({ success: true });
+  }
+
+  if (path === "/api/notifications/clear" && method === "POST") {
+    const user = getAuthorizedUser() as any;
+    if (!clientDb.notifications) clientDb.notifications = [];
+    clientDb.notifications = clientDb.notifications.filter((n: any) => {
+      const isForUser = (
+        n.recipientId === user?.id ||
+        n.recipientId === "all" ||
+        (user?.role === "admin" && (n.recipientId === "admin" || n.recipientRole === "admin")) ||
+        (user?.role === "teacher" && (n.recipientId === "teachers" || n.recipientRole === "teacher"))
+      );
+      return !isForUser;
+    });
+    await saveDbToSupabase();
+    return mockResponse({ success: true });
+  }
+
   if (path === "/api/messages/send" && method === "POST") {
     const user = getAuthorizedUser() as any;
     if (!user) return mockResponse({ error: "Unauthorized" }, 401);
-    const { receiverId, message } = body || {};
+    const { receiverId, message, content } = body || {};
+    const textMsg = message || content;
 
     const newDm = {
       id: generateId("dm"),
       senderId: user.id,
       senderName: user.name,
       receiverId,
-      message,
+      content: textMsg,
+      message: textMsg,
       timestamp: new Date().toISOString()
     };
 
     if (!clientDb.directMessages) clientDb.directMessages = [];
     clientDb.directMessages.push(newDm);
+
+    if (!clientDb.notifications) clientDb.notifications = [];
+    clientDb.notifications.unshift({
+      id: generateId("notif"),
+      recipientId: receiverId,
+      recipientRole: "admin",
+      title: `💬 New Message from ${user.name}`,
+      message: `${user.name} (${user.role.toUpperCase()}): "${(textMsg || '').slice(0, 80)}"`,
+      type: "message",
+      linkTab: "messages",
+      createdAt: new Date().toISOString(),
+      read: false,
+      fromName: user.name,
+      fromRole: user.role
+    });
+
     await saveDbToSupabase();
     return mockResponse({ success: true, message: newDm });
   }

@@ -10,7 +10,7 @@ import crypto from "crypto";
 import multer from "multer";
 import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
-import { User, UserRole, Course, Submission, Donation, Book, Poem, Announcement, DiscussionMessage, DirectMessage, SchoolCalendarEvent, Testimonial } from "./src/types";
+import { User, UserRole, Course, Submission, Donation, Book, Poem, Announcement, DiscussionMessage, DirectMessage, SchoolCalendarEvent, Testimonial, AppNotification } from "./src/types";
 
 const app = express();
 const PORT = 3000;
@@ -96,6 +96,7 @@ interface DatabaseSchema {
   directMessages: DirectMessage[];
   calendar: SchoolCalendarEvent[];
   testimonials: Testimonial[];
+  notifications?: AppNotification[];
   settings: {
     prayerTimes: Record<string, string>;
     hijriAdjustment: number;
@@ -762,6 +763,106 @@ function authenticate(req: express.Request, res: express.Response, next: express
   next();
 }
 
+// --- NOTIFICATION UTILITIES & ENDPOINTS ---
+function createNotification(notif: {
+  recipientId: string; // 'admin' | specific userId | 'teachers' | 'all'
+  recipientRole?: 'admin' | 'teacher' | 'student';
+  title: string;
+  message: string;
+  type: 'message' | 'assignment' | 'free_course' | 'enrollment';
+  linkTab?: string;
+  fromName?: string;
+  fromRole?: string;
+}) {
+  if (!db.notifications) {
+    db.notifications = [];
+  }
+  const newNotif: AppNotification = {
+    id: "notif-" + crypto.randomBytes(8).toString("hex"),
+    recipientId: notif.recipientId,
+    recipientRole: notif.recipientRole,
+    title: notif.title,
+    message: notif.message,
+    type: notif.type,
+    linkTab: notif.linkTab,
+    createdAt: new Date().toISOString(),
+    read: false,
+    fromName: notif.fromName,
+    fromRole: notif.fromRole
+  };
+  db.notifications.unshift(newNotif);
+  if (db.notifications.length > 300) {
+    db.notifications = db.notifications.slice(0, 300);
+  }
+  saveDatabase();
+  return newNotif;
+}
+
+app.get("/api/notifications", authenticate, (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+  if (!user) {
+    res.json([]);
+    return;
+  }
+  const allNotifs = db.notifications || [];
+  const userNotifs = allNotifs.filter(n => {
+    if (n.recipientId === userId) return true;
+    if (n.recipientId === "all") return true;
+    if (user.role === "admin" && (n.recipientId === "admin" || n.recipientRole === "admin")) return true;
+    if (user.role === "teacher" && (n.recipientId === "teachers" || n.recipientRole === "teacher")) return true;
+    return false;
+  });
+  res.json(userNotifs);
+});
+
+app.post("/api/notifications/read", authenticate, (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+  const { id, all } = req.body || {};
+
+  if (!db.notifications) db.notifications = [];
+
+  if (all) {
+    db.notifications.forEach(n => {
+      if (
+        n.recipientId === userId ||
+        n.recipientId === "all" ||
+        (user?.role === "admin" && (n.recipientId === "admin" || n.recipientRole === "admin")) ||
+        (user?.role === "teacher" && (n.recipientId === "teachers" || n.recipientRole === "teacher"))
+      ) {
+        n.read = true;
+      }
+    });
+  } else if (id) {
+    const notif = db.notifications.find(n => n.id === id);
+    if (notif) notif.read = true;
+  }
+
+  saveDatabase();
+  res.json({ success: true });
+});
+
+app.post("/api/notifications/clear", authenticate, (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+
+  if (!db.notifications) db.notifications = [];
+
+  db.notifications = db.notifications.filter(n => {
+    const isForUser = (
+      n.recipientId === userId ||
+      n.recipientId === "all" ||
+      (user?.role === "admin" && (n.recipientId === "admin" || n.recipientRole === "admin")) ||
+      (user?.role === "teacher" && (n.recipientId === "teachers" || n.recipientRole === "teacher"))
+    );
+    return !isForUser;
+  });
+
+  saveDatabase();
+  res.json({ success: true });
+});
+
 // --- DIRECT FILE UPLOADS SYSTEM ---
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -895,6 +996,19 @@ app.post("/api/public/free-course/register", (req, res) => {
       joinedAt: new Date().toISOString()
     };
     (db as any).freeCourseEnrollments.push(student);
+
+    // Notify Admin about new free course stranger/guest student
+    createNotification({
+      recipientId: "admin",
+      recipientRole: "admin",
+      title: `🌟 Stranger Registered for Free Course`,
+      message: `New stranger/guest student "${name}" (WhatsApp: ${whatsapp}) entered and registered for the Free Matn Al-Baydaniyyah Course!`,
+      type: "free_course",
+      linkTab: "freecourse",
+      fromName: name,
+      fromRole: "guest"
+    });
+
     saveDatabase();
   }
 
@@ -946,6 +1060,18 @@ app.post("/api/public/free-course/submit-exam", (req, res) => {
     student.completed = true;
     student.progress = 100;
   }
+
+  // Notify Admin
+  createNotification({
+    recipientId: "admin",
+    recipientRole: "admin",
+    title: `🎓 Free Course Exam Submitted`,
+    message: `Stranger/Guest "${student.name}" (WhatsApp: ${student.whatsapp}) submitted the Free Course Exam! Score: ${score}/5`,
+    type: "free_course",
+    linkTab: "freecourse",
+    fromName: student.name,
+    fromRole: "guest"
+  });
 
   saveDatabase();
   res.json({ success: true, student });
@@ -1517,6 +1643,32 @@ app.post("/api/courses/enroll", authenticate, (req, res) => {
 
   course.enrolledStudentsCount = (course.enrolledStudentsCount || 0) + 1;
   db.users[userId] = user as any; // update
+
+  // Notify Admin & Assigned Teacher about Course Enrollment
+  createNotification({
+    recipientId: "admin",
+    recipientRole: "admin",
+    title: `📚 New Course Enrollment`,
+    message: `Student "${user.name}" (${(user.level || 'beginner').toUpperCase()}) enrolled into course "${course.title}".`,
+    type: "enrollment",
+    linkTab: "admissions",
+    fromName: user.name,
+    fromRole: user.role
+  });
+
+  if (user.teacherId) {
+    createNotification({
+      recipientId: user.teacherId,
+      recipientRole: "teacher",
+      title: `📚 Student Course Enrollment`,
+      message: `Your student "${user.name}" enrolled into course "${course.title}".`,
+      type: "enrollment",
+      linkTab: "tracker",
+      fromName: user.name,
+      fromRole: user.role
+    });
+  }
+
   saveDatabase();
 
   const { passwordHash, salt, ...safeUser } = db.users[userId];
@@ -1605,6 +1757,43 @@ app.post("/api/submissions/submit", authenticate, (req, res) => {
   };
 
   db.submissions.push(newSubmission);
+
+  // Notify Admin
+  createNotification({
+    recipientId: "admin",
+    recipientRole: "admin",
+    title: `📝 ${type.toUpperCase()} Submitted by ${user.name}`,
+    message: `Student ${user.name} submitted ${type} "${referenceTitle}" for course "${newSubmission.courseTitle}".`,
+    type: "assignment",
+    linkTab: "grading",
+    fromName: user.name,
+    fromRole: user.role
+  });
+
+  // Also notify assigned Teacher or all teachers
+  if (user.teacherId) {
+    createNotification({
+      recipientId: user.teacherId,
+      recipientRole: "teacher",
+      title: `📝 ${type.toUpperCase()} Submitted by ${user.name}`,
+      message: `Your student ${user.name} submitted ${type} "${referenceTitle}".`,
+      type: "assignment",
+      linkTab: "grading",
+      fromName: user.name,
+      fromRole: user.role
+    });
+  } else {
+    createNotification({
+      recipientId: "teachers",
+      recipientRole: "teacher",
+      title: `📝 ${type.toUpperCase()} Submitted by ${user.name}`,
+      message: `Student ${user.name} submitted ${type} "${referenceTitle}".`,
+      type: "assignment",
+      linkTab: "grading",
+      fromName: user.name,
+      fromRole: user.role
+    });
+  }
 
   // Update student progress percentage loosely on submission
   if (user.progress[courseId] !== undefined) {
@@ -1847,6 +2036,19 @@ app.post("/api/messages/send", authenticate, (req, res) => {
   };
 
   db.directMessages.push(newMessage);
+
+  // Notify recipient (Teacher or Admin or Student)
+  createNotification({
+    recipientId: receiverId,
+    recipientRole: receiver.role,
+    title: `💬 New Message from ${sender.name}`,
+    message: `${sender.name} (${sender.role.toUpperCase()}): "${content.slice(0, 80)}${content.length > 80 ? '...' : ''}"`,
+    type: "message",
+    linkTab: "messages",
+    fromName: sender.name,
+    fromRole: sender.role
+  });
+
   saveDatabase();
   res.json(newMessage);
 });

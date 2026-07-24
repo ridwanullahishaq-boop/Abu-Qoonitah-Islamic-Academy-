@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from "react";
-import { User, Course, Submission, Announcement, SchoolCalendarEvent, DiscussionMessage, DirectMessage } from "../types";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { User, Course, Submission, Announcement, SchoolCalendarEvent, DiscussionMessage, DirectMessage, AppNotification } from "../types";
 import {
   BookOpen, Users, Video, FileText, CheckCircle2, AlertTriangle, Send, Mail, Key, Shield, UserPlus,
-  ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit
+  ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff
 } from "lucide-react";
 
 interface LMSPortalProps {
@@ -76,6 +76,56 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [calendarEvents, setCalendarEvents] = useState<SchoolCalendarEvent[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   
+  // --- Notifications State & Fetcher ---
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
+  const fetchNotifications = useCallback(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch("/api/notifications", { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setNotifications(data);
+        }
+      })
+      .catch((err) => console.error("Error fetching notifications:", err));
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 10000); // 10s auto refresh for live notifications
+      return () => clearInterval(interval);
+    }
+  }, [currentUser, fetchNotifications]);
+
+  const markNotificationAsRead = (id?: string, all?: boolean) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch("/api/notifications/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id, all })
+    })
+      .then(() => fetchNotifications())
+      .catch((err) => console.error("Error marking notification read:", err));
+  };
+
+  const clearNotifications = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch("/api/notifications/clear", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(() => setNotifications([]))
+      .catch((err) => console.error("Error clearing notifications:", err));
+  };
+
+  const unreadNotifCount = notifications.filter(n => !n.read).length;
+
   // Dashboard Sub-tabs
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [adminSubTab, setAdminSubTab] = useState<string>("payments");
@@ -3735,6 +3785,110 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-amber-600">
                         <Lock className="w-3 h-3" /> Locked (Unpaid)
                       </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Notification Bell Header Button */}
+            <div className="relative pt-1 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                className="relative w-full py-2 px-3 bg-amber-500/10 dark:bg-amber-400/10 hover:bg-amber-500/20 rounded-2xl border border-amber-300 dark:border-amber-700/50 text-emerald-900 dark:text-amber-200 font-bold text-xs flex items-center justify-between cursor-pointer transition-all shadow-sm"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Bell className="w-4 h-4 text-amber-600 dark:text-amber-400 animate-bounce" />
+                  <span className="font-serif font-bold">Notifications</span>
+                </div>
+                {unreadNotifCount > 0 ? (
+                  <span className="bg-red-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full animate-pulse">
+                    {unreadNotifCount} NEW
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400 font-mono">({notifications.length})</span>
+                )}
+              </button>
+
+              {/* Notification Popover Dropdown */}
+              {showNotifDropdown && (
+                <div className="absolute left-0 right-0 top-11 z-50 w-full bg-white dark:bg-emerald-950 rounded-2xl border border-emerald-200 dark:border-emerald-800 shadow-2xl p-3 text-left space-y-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-emerald-100 dark:border-emerald-900">
+                    <h4 className="font-serif font-bold text-xs text-emerald-900 dark:text-amber-200 flex items-center gap-1">
+                      <Bell className="w-3.5 h-3.5 text-amber-500" /> Notifications
+                    </h4>
+                    <div className="flex items-center gap-1.5">
+                      {unreadNotifCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => markNotificationAsRead(undefined, true)}
+                          className="text-[9px] text-emerald-600 dark:text-amber-300 hover:underline font-bold cursor-pointer"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                      {notifications.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={clearNotifications}
+                          className="text-[9px] text-red-500 hover:underline font-bold cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    {notifications.length === 0 ? (
+                      <div className="py-6 text-center text-slate-400 dark:text-emerald-400/60 text-xs">
+                        <BellOff className="w-6 h-6 mx-auto mb-1 opacity-50" />
+                        No notifications yet.
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => {
+                            if (!n.read) markNotificationAsRead(n.id);
+                            if (n.linkTab === "messages") {
+                              setActiveTab("messages");
+                            } else if (n.linkTab === "grading") {
+                              setActiveTab("dashboard");
+                              setTeacherSubTab("grading");
+                            } else if (n.linkTab === "freecourse") {
+                              setActiveTab("dashboard");
+                              setAdminSubTab("freecourse");
+                            } else if (n.linkTab === "admissions") {
+                              setActiveTab("dashboard");
+                              setAdminSubTab("admissions");
+                            } else if (n.linkTab === "tracker") {
+                              setActiveTab("dashboard");
+                              setTeacherSubTab("tracker");
+                            }
+                            setShowNotifDropdown(false);
+                          }}
+                          className={`p-2 rounded-xl border text-xs cursor-pointer transition-all space-y-0.5 ${
+                            !n.read
+                              ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-slate-900 dark:text-amber-100 font-semibold shadow-sm"
+                              : "bg-slate-50 dark:bg-emerald-900/20 border-slate-100 dark:border-emerald-900/40 text-slate-600 dark:text-slate-300 opacity-90"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-[10px] text-emerald-800 dark:text-amber-300">
+                              {n.title}
+                            </span>
+                            {!n.read && (
+                              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                            )}
+                          </div>
+                          <p className="text-[10px] leading-snug">{n.message}</p>
+                          <div className="text-[8px] text-slate-400 dark:text-slate-500 text-right">
+                            {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      ))
                     )}
                   </div>
                 </div>
