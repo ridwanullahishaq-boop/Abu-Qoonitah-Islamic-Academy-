@@ -344,9 +344,7 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [studentTeacherMap, setStudentTeacherMap] = useState<Record<string, string>>({});
   const [studentAccessMap, setStudentAccessMap] = useState<Record<string, boolean>>({});
 
-  // Role simulation state for seamlessly viewing Student, Teacher, and Admin portals
-  const [simulatedRole, setSimulatedRole] = useState<"admin" | "teacher" | "student" | null>(null);
-  const effectiveRole = simulatedRole || currentUser?.role;
+  const effectiveRole = currentUser?.role;
 
   // Student Payment submission states
   const [payMonth, setPayMonth] = useState("July 2026");
@@ -3529,113 +3527,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               New Student? Admissions Registration
             </button>
 
-            {/* 1-Click Direct Portal Access Buttons */}
-            <div className="pt-2 border-t border-emerald-100 dark:border-emerald-800/60 space-y-2">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-emerald-300 block text-center uppercase tracking-wider">
-                ⚡ 1-Click Direct Portal Login
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername("Student");
-                    setPassword("Student@123");
-                    fetch("/api/auth/login", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ username: "Student", password: "Student@123" })
-                    })
-                      .then((res) => res.json())
-                      .then((data) => {
-                        if (data.token) {
-                          localStorage.setItem("token", data.token);
-                          onLoginSuccess(data.user, data.token);
-                        }
-                      })
-                      .catch(() => {});
-                  }}
-                  className="p-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-left text-xs font-bold transition-all shadow-xs cursor-pointer flex flex-col justify-between"
-                >
-                  <span className="flex items-center gap-1"><BookOpen className="w-3.5 h-3.5 text-natural-gold shrink-0" /> Student Portal</span>
-                  <span className="text-[9px] font-normal opacity-90 mt-1">Zayd Mansoor (Unlocked)</span>
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername("Teacher");
-                    setPassword("Teacher@123");
-                    fetch("/api/auth/login", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ username: "Teacher", password: "Teacher@123" })
-                    })
-                      .then((res) => res.json())
-                      .then((data) => {
-                        if (data.token) {
-                          localStorage.setItem("token", data.token);
-                          onLoginSuccess(data.user, data.token);
-                        }
-                      })
-                      .catch(() => {});
-                  }}
-                  className="p-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-left text-xs font-bold transition-all shadow-xs cursor-pointer flex flex-col justify-between"
-                >
-                  <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-amber-200 shrink-0" /> Teacher Portal</span>
-                  <span className="text-[9px] font-normal opacity-90 mt-1">Shaykh Ahmed Al-Misri</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername("Admin");
-                    setPassword("Ridwanullah@123");
-                    fetch("/api/auth/login", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ username: "Admin", password: "Ridwanullah@123" })
-                    })
-                      .then((res) => res.json())
-                      .then((data) => {
-                        if (data.token) {
-                          localStorage.setItem("token", data.token);
-                          onLoginSuccess(data.user, data.token);
-                        }
-                      })
-                      .catch(() => {});
-                  }}
-                  className="p-2.5 bg-emerald-950 hover:bg-black text-amber-300 border border-amber-500/40 rounded-xl text-left text-xs font-bold transition-all shadow-xs cursor-pointer flex flex-col justify-between"
-                >
-                  <span className="flex items-center gap-1"><Shield className="w-3.5 h-3.5 text-natural-gold shrink-0" /> Admin Portal</span>
-                  <span className="text-[9px] font-normal opacity-90 mt-1">Ustadh Abu Qoonitah</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUsername("LockedStudent");
-                    setPassword("Student@123");
-                    fetch("/api/auth/login", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ username: "LockedStudent", password: "Student@123" })
-                    })
-                      .then((res) => res.json())
-                      .then((data) => {
-                        if (data.token) {
-                          localStorage.setItem("token", data.token);
-                          onLoginSuccess(data.user, data.token);
-                        }
-                      })
-                      .catch(() => {});
-                  }}
-                  className="p-2.5 bg-slate-700 hover:bg-slate-800 text-slate-100 rounded-xl text-left text-xs font-bold transition-all shadow-xs cursor-pointer flex flex-col justify-between"
-                >
-                  <span className="flex items-center gap-1"><Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" /> Unpaid Student</span>
-                  <span className="text-[9px] font-normal opacity-90 mt-1">Sumayyah (Locked)</span>
-                </button>
-              </div>
-            </div>
           </form>
         )}
       </div>
@@ -3997,7 +3889,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
             <div>
               <h3 className="font-serif font-bold text-sm sm:text-base text-natural-green dark:text-white">{currentUser.name}</h3>
               <p className="text-[10px] uppercase tracking-widest text-natural-gold font-mono">
-                {effectiveRole} Mode ({currentUser.role} Account)
+                {currentUser.role} Account
               </p>
               {effectiveRole === "student" && (
                 <div className="mt-2 space-y-1">
@@ -4017,48 +3909,6 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Portal Role View Switcher */}
-            <div className="p-2.5 bg-emerald-50/60 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 space-y-2">
-              <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
-                ⚡ Portal View Mode
-              </span>
-              <div className="grid grid-cols-3 gap-1">
-                <button
-                  type="button"
-                  onClick={() => { setSimulatedRole("student"); setActiveTab("dashboard"); }}
-                  className={`py-1.5 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                    effectiveRole === "student"
-                      ? "bg-emerald-700 text-white shadow-xs"
-                      : "bg-white dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100"
-                  }`}
-                >
-                  🎓 Student
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setSimulatedRole("teacher"); setActiveTab("dashboard"); }}
-                  className={`py-1.5 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                    effectiveRole === "teacher"
-                      ? "bg-amber-600 text-white shadow-xs"
-                      : "bg-white dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100"
-                  }`}
-                >
-                  👨‍🏫 Teacher
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setSimulatedRole("admin"); setActiveTab("dashboard"); }}
-                  className={`py-1.5 px-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-                    effectiveRole === "admin"
-                      ? "bg-emerald-950 text-amber-300 border border-amber-500/40 shadow-xs"
-                      : "bg-white dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100"
-                  }`}
-                >
-                  👑 Admin
-                </button>
-              </div>
             </div>
 
             {/* Notification Bell Header Button */}
@@ -4805,33 +4655,54 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     </div>
                   )}
 
-                  {/* SUB-TAB 1: ENROLLED COURSES & CLASSROOM */}
+                   {/* SUB-TAB 1: ENROLLED COURSES & CLASSROOM */}
                   {studentSubTab === "courses" && (
                     <div className="space-y-6">
                       {!selectedCourse ? (
                         <div className="bg-white dark:bg-emerald-900 rounded-xl p-6 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-6">
-                          <h2 className="text-lg font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2">
+                          <div className="bg-emerald-50/80 dark:bg-emerald-950/60 p-4 rounded-xl border border-emerald-200/80 dark:border-emerald-800/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 block">Your Enrolled Academic Track</span>
+                              <h3 className="font-bold text-sm sm:text-base text-emerald-950 dark:text-amber-100 capitalize flex items-center gap-1.5">
+                                🎯 {(currentUser.level || 'beginner').toUpperCase()} Level Track Student
+                              </h3>
+                              <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                                You have exclusive access to <strong>{(currentUser.level || 'beginner').toUpperCase()}</strong> level track courses and study materials.
+                              </p>
+                            </div>
+                            <span className="bg-amber-500 text-emerald-950 px-3 py-1 rounded-full font-bold text-xs capitalize shadow-xs shrink-0">
+                              {(currentUser.level || 'beginner')} Track
+                            </span>
+                          </div>
+
+                          <h2 className="text-lg font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2 pt-2">
                             <BookOpen className="w-5 h-5 text-amber-500" />
-                            <span>Your Enrolled Courses</span>
+                            <span>Your Academic Level Track Courses</span>
                           </h2>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {courses.map((course) => {
                               const isEnrolled = currentUser.enrolledCourses.includes(course.id);
-                              const isLocked = course.level !== "free" && !currentUser.isPaid;
+                              const studentLevel = currentUser.level || "beginner";
+                              const isLevelMismatch = course.level !== "free" && course.level !== studentLevel;
+                              const isLocked = (course.level !== "free" && !currentUser.isPaid) || isLevelMismatch;
                               const progress = currentUser.progress[course.id] || 0;
 
                               return (
                                 <div
                                   key={course.id}
-                                  className={`p-5 rounded-xl border flex flex-col justify-between bg-white dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/50`}
+                                  className={`p-5 rounded-xl border flex flex-col justify-between bg-white dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-900/50 ${isLevelMismatch ? 'opacity-85 bg-amber-50/20' : ''}`}
                                 >
                                   <div className="space-y-3">
                                     <div className="flex justify-between items-center text-[10px] font-bold uppercase">
-                                      <span className="bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded text-emerald-800 dark:text-amber-300">
+                                      <span className={`px-2 py-0.5 rounded ${isLevelMismatch ? 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-200 font-extrabold' : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-amber-300'}`}>
                                         {course.level} Track
                                       </span>
-                                      {isLocked && <span className="text-red-600 flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</span>}
+                                      {isLevelMismatch ? (
+                                        <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1 font-bold"><Lock className="w-3 h-3" /> Level Track Restricted</span>
+                                      ) : isLocked ? (
+                                        <span className="text-red-600 flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</span>
+                                      ) : null}
                                     </div>
 
                                     <h3 className="font-bold text-sm sm:text-base text-emerald-900 dark:text-white">{course.title}</h3>
@@ -4853,18 +4724,25 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   <div className="border-t border-emerald-50 dark:border-emerald-850 mt-4 pt-3 flex justify-between items-center">
                                     <span className="text-[10px] font-semibold text-emerald-500">{course.duration} duration</span>
                                     
-                                    {isEnrolled ? (
+                                    {isLevelMismatch ? (
+                                      <button
+                                        onClick={() => alert(`Access Restricted: You are classified as a ${studentLevel.toUpperCase()} level student. You can only access ${studentLevel.toUpperCase()} level tracks. Please contact administration if you wish to upgrade your academic track.`)}
+                                        className="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80 text-[10px] font-bold rounded cursor-pointer flex items-center gap-1"
+                                      >
+                                        <Lock className="w-3 h-3" /> {course.level.toUpperCase()} Track Restricted
+                                      </button>
+                                    ) : isEnrolled ? (
                                       isLocked ? (
                                         <button
                                           onClick={() => alert("This premium course level requires enrollment payment clearance. Please submit your monthly tuition receipt in the Payments tab to unlock.")}
-                                          className="px-3 py-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 text-[10px] font-bold rounded"
+                                          className="px-3 py-1 bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 text-[10px] font-bold rounded cursor-pointer"
                                         >
                                           Unlock Access
                                         </button>
                                       ) : (
                                         <button
                                           onClick={() => setSelectedCourse(course)}
-                                          className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-bold rounded flex items-center gap-1"
+                                          className="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-bold rounded flex items-center gap-1 cursor-pointer"
                                         >
                                           <span>Enter Classroom</span>
                                           <ArrowRight className="w-3 h-3" />
