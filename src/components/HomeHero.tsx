@@ -19,10 +19,21 @@ export default function HomeHero({ isArabic, setActivePage, isDarkMode }: HomeHe
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [quote, setQuote] = useState({ arabic: "", translation: "", source: "" });
+  const [activeSemester, setActiveSemester] = useState("Semester 1");
 
   const [featuredCourses, setFeaturedCourses] = useState<any[]>([]);
 
   useEffect(() => {
+    // Fetch active academic semester
+    fetch("/api/public/academic-semester")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.activeSemester) {
+          setActiveSemester(data.activeSemester);
+        }
+      })
+      .catch((err) => console.error("Error loading academic semester:", err));
+
     // Fetch statistics
     fetch("/api/public/stats")
       .then((res) => res.json())
@@ -125,9 +136,15 @@ export default function HomeHero({ isArabic, setActivePage, isDarkMode }: HomeHe
           
           {/* Welcome Text Content */}
           <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-            <span className="inline-block px-4 py-1.5 bg-emerald-700/50 rounded-full text-xs font-bold tracking-widest uppercase mb-2 border border-emerald-600/60 text-emerald-50">
-              {isArabic ? "أكاديمية إسلامية رقمية متكاملة" : "Modern Online Madrasah"}
-            </span>
+            <div className="flex flex-wrap justify-center lg:justify-start items-center gap-2 mb-2">
+              <span className="inline-block px-4 py-1.5 bg-emerald-700/50 rounded-full text-xs font-bold tracking-widest uppercase border border-emerald-600/60 text-emerald-50">
+                {isArabic ? "أكاديمية إسلامية رقمية متكاملة" : "Modern Online Madrasah"}
+              </span>
+              <span className="inline-block px-3.5 py-1.5 bg-amber-400 text-emerald-950 rounded-full text-xs font-extrabold uppercase tracking-wide shadow-md flex items-center gap-1.5">
+                <span>🎓</span>
+                <span>{activeSemester === "Semester 1" ? (isArabic ? "الفصل الدراسي الأول" : "Current Session: First Semester (Semester 1)") : (isArabic ? "الفصل الدراسي الثاني" : "Current Session: Second Semester (Semester 2)")}</span>
+              </span>
+            </div>
             
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-light tracking-tight text-white leading-[1.15]">
               {isArabic ? (

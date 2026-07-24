@@ -100,6 +100,7 @@ interface DatabaseSchema {
   settings: {
     prayerTimes: Record<string, string>;
     hijriAdjustment: number;
+    activeSemester?: string;
     quoteOfTheDay: { arabic: string; translation: string; source: string };
   };
   freeCourse: {
@@ -401,6 +402,7 @@ const initialDB: DatabaseSchema = {
   settings: {
     prayerTimes: { Fajr: "05:11 AM", Dhuhr: "12:48 PM", Asr: "04:12 PM", Maghrib: "07:02 PM", Isha: "08:18 PM" },
     hijriAdjustment: 1447, // Current Year
+    activeSemester: "Semester 1",
     quoteOfTheDay: {
       arabic: "مَنْ سَلَكَ طَرِيقًا يَلْتَمِسُ فِيهِ عِلْمًا سَهَّلَ اللَّهُ لَهُ بِهِ طَرِيقًا إِلَى الْجَنَّةِ",
       translation: "Whoever takes a path upon which he seeks knowledge, Allah will make easy for him a path to Paradise.",
@@ -766,10 +768,10 @@ function authenticate(req: express.Request, res: express.Response, next: express
 // --- NOTIFICATION UTILITIES & ENDPOINTS ---
 function createNotification(notif: {
   recipientId: string; // 'admin' | specific userId | 'teachers' | 'all'
-  recipientRole?: 'admin' | 'teacher' | 'student';
+  recipientRole?: 'admin' | 'teacher' | 'student' | 'all';
   title: string;
   message: string;
-  type: 'message' | 'assignment' | 'free_course' | 'enrollment';
+  type: 'message' | 'assignment' | 'free_course' | 'enrollment' | 'announcement';
   linkTab?: string;
   fromName?: string;
   fromRole?: string;
@@ -861,6 +863,64 @@ app.post("/api/notifications/clear", authenticate, (req, res) => {
 
   saveDatabase();
   res.json({ success: true });
+});
+
+app.post("/api/student/certificate-downloaded", authenticate, (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+  const { certificateType, studentName, studentLevel } = req.body || {};
+
+  const name = studentName || user?.name || "Student";
+  const level = studentLevel || user?.level || certificateType || "beginner";
+
+  // Create high priority Admin Notification
+  createNotification({
+    recipientId: "admin",
+    recipientRole: "admin",
+    title: "🎓 Certificate Downloaded",
+    message: `Graduating student ${name} (${level.toUpperCase()} track) has downloaded their official Graduation Certificate.`,
+    type: "enrollment",
+    linkTab: "admissions",
+    fromName: name,
+    fromRole: "student"
+  });
+
+  res.json({ success: true, message: "Admin notified of certificate download" });
+});
+
+app.get("/api/public/academic-semester", (req, res) => {
+  res.json({ activeSemester: db.settings?.activeSemester || "Semester 1" });
+});
+
+app.post("/api/admin/active-semester", authenticate, (req, res) => {
+  const userId = (req as any).userId;
+  const user = db.users[userId];
+  if (!user || user.role !== "admin") {
+    res.status(403).json({ error: "Access denied. Admins only." });
+    return;
+  }
+  const { activeSemester } = req.body || {};
+  if (!activeSemester || (activeSemester !== "Semester 1" && activeSemester !== "Semester 2")) {
+    res.status(400).json({ error: "Invalid activeSemester. Must be 'Semester 1' or 'Semester 2'." });
+    return;
+  }
+
+  db.settings.activeSemester = activeSemester;
+
+  // Broadcast notification to all students & teachers
+  createNotification({
+    recipientId: "all",
+    recipientRole: "all",
+    title: `📢 Global Academic Term Switched: ${activeSemester}`,
+    message: `The Academy Administration has toggled the active academic term to ${activeSemester}. Curriculum schedules and exam trackers now run on ${activeSemester}.`,
+    type: "announcement",
+    linkTab: "calendar",
+    fromName: "Academy Administration",
+    fromRole: "admin"
+  });
+
+  saveDatabase();
+  res.json({ success: true, activeSemester: db.settings.activeSemester });
 });
 
 // --- DIRECT FILE UPLOADS SYSTEM ---

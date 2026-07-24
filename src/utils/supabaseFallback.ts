@@ -665,6 +665,61 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
     return mockResponse({ success: true });
   }
 
+  if (path === "/api/student/certificate-downloaded" && method === "POST") {
+    const user = getAuthorizedUser() as any;
+    const { certificateType, studentName, studentLevel } = body || {};
+    const name = studentName || user?.name || "Student";
+    const level = studentLevel || user?.level || certificateType || "beginner";
+
+    if (!clientDb.notifications) clientDb.notifications = [];
+    clientDb.notifications.unshift({
+      id: "notif-" + Math.random().toString(36).substring(2, 9),
+      recipientId: "admin",
+      recipientRole: "admin",
+      title: "🎓 Certificate Downloaded",
+      message: `Graduating student ${name} (${level.toUpperCase()} track) has downloaded their official Graduation Certificate.`,
+      type: "enrollment",
+      linkTab: "admissions",
+      createdAt: new Date().toISOString(),
+      read: false,
+      fromName: name,
+      fromRole: "student"
+    });
+    await saveDbToSupabase();
+    return mockResponse({ success: true, message: "Admin notified of certificate download" });
+  }
+
+  if (path === "/api/public/academic-semester" && method === "GET") {
+    if (!clientDb.settings) clientDb.settings = {};
+    return mockResponse({ activeSemester: clientDb.settings.activeSemester || "Semester 1" });
+  }
+
+  if (path === "/api/admin/active-semester" && method === "POST") {
+    const user = getAuthorizedUser() as any;
+    if (!user || user.role !== "admin") return mockResponse({ error: "Unauthorized" }, 403);
+    const { activeSemester } = body || {};
+    if (!clientDb.settings) clientDb.settings = {};
+    clientDb.settings.activeSemester = activeSemester || "Semester 1";
+
+    if (!clientDb.notifications) clientDb.notifications = [];
+    clientDb.notifications.unshift({
+      id: "notif-" + Math.random().toString(36).substring(2, 9),
+      recipientId: "all",
+      recipientRole: "all",
+      title: `📢 Global Academic Term Switched: ${activeSemester}`,
+      message: `The Academy Administration has toggled the active academic term to ${activeSemester}.`,
+      type: "announcement",
+      linkTab: "calendar",
+      createdAt: new Date().toISOString(),
+      read: false,
+      fromName: "Academy Administration",
+      fromRole: "admin"
+    });
+
+    await saveDbToSupabase();
+    return mockResponse({ success: true, activeSemester: clientDb.settings.activeSemester });
+  }
+
   if (path === "/api/messages/send" && method === "POST") {
     const user = getAuthorizedUser() as any;
     if (!user) return mockResponse({ error: "Unauthorized" }, 401);

@@ -72,6 +72,12 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
     return course?.level === "intermediate";
   });
 
+  const passedAdvance = submissions.some(s => {
+    if (s.type !== "quiz") return false;
+    const course = courses.find(c => c.id === s.courseId);
+    return course?.level === "advance";
+  });
+
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<SchoolCalendarEvent[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -158,6 +164,149 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  const notifyAdminCertificateDownload = async (certType: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      await fetch("/api/student/certificate-downloaded", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          certificateType: certType,
+          studentName: currentUser?.name,
+          studentLevel: currentUser?.level || certType,
+        }),
+      });
+      setCertDownloadedNotice(`Admin (Ustadh Abu Qoonitah) has been notified of your ${certType.toUpperCase()} Graduation Certificate download!`);
+      setTimeout(() => setCertDownloadedNotice(null), 8000);
+    } catch (e) {
+      console.error("Certificate notification error:", e);
+    }
+  };
+
+  const handleDownloadCertificateImage = (certType: string) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 850;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Background
+    ctx.fillStyle = "#FCFBF7";
+    ctx.fillRect(0, 0, 1200, 850);
+
+    // Double Border
+    ctx.strokeStyle = "#065f46";
+    ctx.lineWidth = 14;
+    ctx.strokeRect(30, 30, 1140, 790);
+
+    ctx.strokeStyle = "#d97706";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(48, 48, 1104, 754);
+
+    // Academy Badge Header
+    ctx.fillStyle = "#d97706";
+    ctx.font = "bold 18px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("شَهَادَةُ إِتْمَام", 600, 110);
+
+    ctx.fillStyle = "#064e3b";
+    ctx.font = "bold 32px serif";
+    ctx.fillText("ABU QOONITAH ISLAMIC ACADEMY", 600, 160);
+
+    ctx.fillStyle = "#64748b";
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText("AUTHORIZED BOARD OF ISLAMIC EDUCATION STUDIES", 600, 190);
+
+    // Gold Divider Line
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(400, 220);
+    ctx.lineTo(800, 220);
+    ctx.stroke();
+
+    // Certificate Title
+    ctx.fillStyle = "#b45309";
+    ctx.font = "italic bold 28px serif";
+    ctx.fillText("Certificate of Graduation & Achievement", 600, 260);
+
+    // Recipient Certification
+    ctx.fillStyle = "#334155";
+    ctx.font = "18px sans-serif";
+    ctx.fillText("This is to certify that the beloved student", 600, 320);
+
+    ctx.fillStyle = "#064e3b";
+    ctx.font = "bold 38px sans-serif";
+    ctx.fillText(currentUser?.name || "Graduating Student", 600, 380);
+
+    // Underline
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(350, 395);
+    ctx.lineTo(850, 395);
+    ctx.stroke();
+
+    // Body Text
+    ctx.fillStyle = "#334155";
+    ctx.font = "16px sans-serif";
+    ctx.fillText("has successfully passed all scheduled examinations and fulfilled graduation requirements for the", 600, 440);
+
+    const titleText = certType === "beginner"
+      ? "BEGINNER SECTION (AL-MUBTADI’)"
+      : certType === "intermediate"
+      ? "INTERMEDIATE SECTION (AL-MUTAWASSIT)"
+      : "ADVANCE SECTION (AL-MUTAQADDIM)";
+
+    ctx.fillStyle = "#022c22";
+    ctx.font = "bold 22px sans-serif";
+    ctx.fillText(titleText, 600, 490);
+
+    ctx.fillStyle = "#475569";
+    ctx.font = "15px sans-serif";
+    ctx.fillText("of the official academic syllabus, demonstrating upright character and dedication to Islamic knowledge.", 600, 540);
+
+    // Signatures & Sign
+    ctx.fillStyle = "#1e293b";
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillText("Ishaq Ridwanullah B.", 300, 680);
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#64748b";
+    ctx.fillText("Academy Director", 300, 705);
+
+    // Seal
+    ctx.beginPath();
+    ctx.arc(600, 680, 45, 0, 2 * Math.PI);
+    ctx.fillStyle = "#f59e0b";
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+
+    ctx.fillStyle = "#78350f";
+    ctx.font = "bold 14px monospace";
+    ctx.fillText("ACADEMY", 600, 675);
+    ctx.fillText("SEAL", 600, 693);
+
+    // Date
+    const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    ctx.fillStyle = "#1e293b";
+    ctx.font = "bold 16px monospace";
+    ctx.fillText(dateStr, 900, 680);
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#64748b";
+    ctx.fillText("Date of Graduation", 900, 705);
+
+    // Trigger download
+    const link = document.createElement("a");
+    link.download = `Graduation_Certificate_${(currentUser?.name || "Student").replace(/\s+/g, "_")}_${certType}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+
   // 50-Mark Semester 1 Marking System Helper
   const calculateSemesterMarks = (studentName: string) => {
     const studentSubs = submissions.filter(s => s.studentName === studentName);
@@ -242,9 +391,43 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
 
   // Tuition Payment state overrides
   const [tuitionPayType, setTuitionPayType] = useState<'monthly' | 'semester'>('semester');
-  const [activeCertificate, setActiveCertificate] = useState<"beginner" | "intermediate" | "free" | null>(null);
+  const [activeCertificate, setActiveCertificate] = useState<"beginner" | "intermediate" | "advance" | "free" | null>(null);
+  const [certDownloadedNotice, setCertDownloadedNotice] = useState<string | null>(null);
   const [calendarSemester, setCalendarSemester] = useState<"semester1" | "semester2">("semester1");
   const [selectedReportSemester, setSelectedReportSemester] = useState<1 | 2>(1);
+
+  // Global Active Academic Semester state
+  const [globalActiveSemester, setGlobalActiveSemester] = useState<"Semester 1" | "Semester 2">("Semester 1");
+  const [activeSemesterSaving, setActiveSemesterSaving] = useState(false);
+  const [semesterSuccessMsg, setSemesterSuccessMsg] = useState("");
+
+  const handleToggleActiveSemester = async (sem: "Semester 1" | "Semester 2") => {
+    if (sem === globalActiveSemester) return;
+    setActiveSemesterSaving(true);
+    try {
+      const token = localStorage.getItem("token") || "";
+      const res = await fetch("/api/admin/active-semester", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ activeSemester: sem })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGlobalActiveSemester(sem);
+        setCalendarSemester(sem === "Semester 2" ? "semester2" : "semester1");
+        setSelectedReportSemester(sem === "Semester 2" ? 2 : 1);
+        setSemesterSuccessMsg(`Global Academic Term successfully toggled to ${sem}! Reflected across Admin, Teacher, Student, and Hero dashboards.`);
+        setTimeout(() => setSemesterSuccessMsg(""), 6000);
+      }
+    } catch (e) {
+      console.error("Error toggling active semester:", e);
+    } finally {
+      setActiveSemesterSaving(false);
+    }
+  };
 
   // Assignment upload states
   const [activeAssign, setActiveAssign] = useState<any | null>(null);
@@ -520,6 +703,18 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
 
   // --- LOAD LMS DATA UPON AUTH ---
   useEffect(() => {
+    // Load Active Academic Semester globally
+    fetch("/api/public/academic-semester")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.activeSemester) {
+          setGlobalActiveSemester(data.activeSemester);
+          setCalendarSemester(data.activeSemester === "Semester 2" ? "semester2" : "semester1");
+          setSelectedReportSemester(data.activeSemester === "Semester 2" ? 2 : 1);
+        }
+      })
+      .catch((err) => console.error(err));
+
     if (currentUser) {
       const token = localStorage.getItem("token") || "";
       const headers = { Authorization: `Bearer ${token}` };
@@ -4105,29 +4300,34 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
           {activeTab === "calendar" && (
             <div className="space-y-6">
               {/* Semester Selector Switcher */}
-              <div className="flex justify-center items-center gap-3 bg-white dark:bg-emerald-950 p-2.5 rounded-2xl max-w-sm mx-auto border border-emerald-100 dark:border-emerald-900 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setCalendarSemester("semester1")}
-                  className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    calendarSemester === "semester1"
-                      ? "bg-emerald-700 text-white shadow-md scale-[1.02]"
-                      : "text-slate-600 dark:text-emerald-200 hover:text-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/40"
-                  }`}
-                >
-                  Semester 1 (3 Months)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCalendarSemester("semester2")}
-                  className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    calendarSemester === "semester2"
-                      ? "bg-emerald-700 text-white shadow-md scale-[1.02]"
-                      : "text-slate-600 dark:text-emerald-200 hover:text-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/40"
-                  }`}
-                >
-                  Semester 2 (3 Months)
-                </button>
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-[11px] font-bold text-emerald-800 dark:text-amber-300 bg-emerald-100 dark:bg-emerald-900/80 px-3 py-1 rounded-full border border-emerald-300 dark:border-emerald-700">
+                  🎓 Official Active Academic Session: <strong>{globalActiveSemester}</strong>
+                </span>
+                <div className="flex justify-center items-center gap-3 bg-white dark:bg-emerald-950 p-2.5 rounded-2xl max-w-sm w-full border border-emerald-100 dark:border-emerald-900 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarSemester("semester1")}
+                    className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      calendarSemester === "semester1"
+                        ? "bg-emerald-700 text-white shadow-md scale-[1.02]"
+                        : "text-slate-600 dark:text-emerald-200 hover:text-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/40"
+                    }`}
+                  >
+                    Semester 1 (3 Months) {globalActiveSemester === "Semester 1" && "✓"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarSemester("semester2")}
+                    className={`flex-1 py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      calendarSemester === "semester2"
+                        ? "bg-emerald-700 text-white shadow-md scale-[1.02]"
+                        : "text-slate-600 dark:text-emerald-200 hover:text-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/40"
+                    }`}
+                  >
+                    Semester 2 (3 Months) {globalActiveSemester === "Semester 2" && "✓"}
+                  </button>
+                </div>
               </div>
 
               {/* Official Beautiful Master Syllabus & Guidelines */}
@@ -4488,7 +4688,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           {(currentUser.level || 'beginner').toUpperCase()} TRACK
                         </span>
                         <span className="bg-emerald-950/80 text-amber-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                          📚 {currentUser.semester || 'Semester 1'}
+                          📚 Active Term: {globalActiveSemester}
                         </span>
                         {currentUser.isPaid ? (
                           <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
@@ -4504,7 +4704,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         Assalamu Alaikum, {currentUser.name}!
                       </h1>
                       <p className="text-xs text-emerald-200/90 max-w-xl leading-relaxed">
-                        You are enrolled as a <strong className="text-amber-300 capitalize">{currentUser.level || 'beginner'}</strong> level student in <strong className="text-amber-300">{currentUser.semester || 'Semester 1'}</strong>. You have exclusive access to all <span className="capitalize text-amber-300">{currentUser.level || 'beginner'}</span> level courses and assigned lectures.
+                        You are enrolled as a <strong className="text-amber-300 capitalize">{currentUser.level || 'beginner'}</strong> level student in <strong className="text-amber-300">{globalActiveSemester}</strong>. You have exclusive access to all <span className="capitalize text-amber-300">{currentUser.level || 'beginner'}</span> level courses and assigned lectures.
                       </p>
                     </div>
 
@@ -5757,7 +5957,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                   {studentSubTab === "certificates" && (
                     <div className="space-y-6">
-                      {/* CSS style block for absolute print perfection */}
+                      {/* CSS style block for print formatting */}
                       <style>{`
                         @media print {
                           body * {
@@ -5783,106 +5983,129 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         }
                       `}</style>
 
-                      <div className="bg-white dark:bg-emerald-900 rounded-xl p-6 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-4">
-                        <h2 className="text-lg font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2">
-                          <Award className="w-5 h-5 text-amber-500" />
-                          <span>Academic Graduation & Certificates</span>
-                        </h2>
-                        <p className="text-xs text-emerald-650 dark:text-emerald-350 leading-relaxed">
-                          Abu Qoonitah Academy honors students who complete academic milestones. Clear CBT examinations and submit worksheets to unlock official printable graduation credentials.
-                        </p>
+                      {certDownloadedNotice && (
+                        <div className="bg-emerald-50 border-2 border-emerald-500/80 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 p-4 rounded-xl flex items-center justify-between gap-3 text-xs font-bold shadow-md animate-fade-in">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">✅</span>
+                            <span>{certDownloadedNotice}</span>
+                          </div>
+                          <button onClick={() => setCertDownloadedNotice(null)} className="text-xs text-slate-500 hover:text-slate-800">✕</button>
+                        </div>
+                      )}
+
+                      <div className="bg-white dark:bg-emerald-900 rounded-xl p-6 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-3">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                          <div>
+                            <h2 className="text-lg font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2">
+                              <Award className="w-5 h-5 text-amber-500" />
+                              <span>Academic Graduation & Official Certificates</span>
+                            </h2>
+                            <p className="text-xs text-emerald-650 dark:text-emerald-350 leading-relaxed mt-1">
+                              Abu Qoonitah Academy honors graduating students. Download your official graduation certificate below. Downloading will automatically notify Academy Administration.
+                            </p>
+                          </div>
+                          <span className="bg-amber-400 text-emerald-950 text-[11px] font-black uppercase px-3 py-1 rounded-full shrink-0 shadow-xs">
+                            🎓 {(currentUser.level || 'beginner').toUpperCase()} TRACK GRADUATE
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* 1. Beginner Section Certificate Card */}
-                        <div className="bg-white dark:bg-emerald-900 rounded-2xl p-6 border border-emerald-150 dark:border-emerald-800 shadow-xs space-y-4 relative overflow-hidden flex flex-col justify-between">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-start">
-                              <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 bg-emerald-500/10 px-2.5 py-1 rounded-full">Beginner Section</span>
-                              {passedBeginner ? (
-                                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-                                  <span>●</span> Graduated
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                                  <span>○</span> Locked
-                                </span>
-                              )}
+                        {(() => {
+                          const isUnlocked = passedBeginner || currentUser.isGraduated || currentUser.status === "graduated" || currentUser.level === "beginner" || currentUser.level === "intermediate" || currentUser.level === "advance";
+                          return (
+                            <div className="bg-white dark:bg-emerald-900 rounded-2xl p-5 border border-emerald-150 dark:border-emerald-800 shadow-xs space-y-4 relative overflow-hidden flex flex-col justify-between">
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 bg-emerald-500/10 px-2.5 py-1 rounded-full">Beginner Section</span>
+                                  <span className={`text-[10px] font-bold flex items-center gap-1 ${isUnlocked ? "text-emerald-700 dark:text-emerald-300" : "text-amber-600"}`}>
+                                    {isUnlocked ? "● Accessible" : "○ Locked"}
+                                  </span>
+                                </div>
+                                <h3 className="text-sm font-bold text-emerald-950 dark:text-white">Al-Mubtadi’ Graduation Certificate</h3>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                  Awarded for completing core Islamic studies, Fiqh basics, and Qur'anic Arabic principles.
+                                </p>
+                              </div>
+
+                              <div className="space-y-2 pt-2">
+                                <button
+                                  onClick={() => setActiveCertificate("beginner")}
+                                  className={`w-full py-2 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                                    isUnlocked ? "bg-amber-500 hover:bg-amber-600 text-emerald-950" : "bg-emerald-700 hover:bg-emerald-800 text-white"
+                                  }`}
+                                >
+                                  🎓 View & Download Certificate
+                                </button>
+                              </div>
                             </div>
-                            <h3 className="text-base font-bold text-emerald-950 dark:text-white">Al-Mubtadi’ Graduation Certificate</h3>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                              Awarded to students completing core Islamic studies, basics of Fiqh, and foundational Qur'anic Arabic principles.
-                            </p>
-                          </div>
-
-                          <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-lg text-[10px] font-mono text-emerald-800 dark:text-emerald-400">
-                            <span className="font-bold block mb-1">UNLOX CONDITION:</span>
-                            Pass any Beginner Level CBT Quiz with a score of 50% or higher.
-                          </div>
-
-                          {passedBeginner ? (
-                            <button
-                              onClick={() => setActiveCertificate("beginner")}
-                              className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer text-center"
-                            >
-                              🎓 View & Print Graduation Certificate
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              className="w-full py-2 bg-slate-100 dark:bg-slate-800/50 text-slate-400 font-bold text-xs rounded-lg cursor-not-allowed text-center"
-                            >
-                              🔒 Locked (Complete Beginner CBT First)
-                            </button>
-                          )}
-                        </div>
+                          );
+                        })()}
 
                         {/* 2. Intermediate Section Certificate Card */}
-                        <div className="bg-white dark:bg-emerald-900 rounded-2xl p-6 border border-emerald-150 dark:border-emerald-800 shadow-xs space-y-4 relative overflow-hidden flex flex-col justify-between">
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-start">
-                              <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 bg-emerald-500/10 px-2.5 py-1 rounded-full">Intermediate Section</span>
-                              {passedIntermediate ? (
-                                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-                                  <span>●</span> Graduated
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                                  <span>○</span> Locked
-                                </span>
-                              )}
+                        {(() => {
+                          const isUnlocked = passedIntermediate || currentUser.isGraduated || currentUser.status === "graduated" || currentUser.level === "intermediate" || currentUser.level === "advance";
+                          return (
+                            <div className="bg-white dark:bg-emerald-900 rounded-2xl p-5 border border-emerald-150 dark:border-emerald-800 shadow-xs space-y-4 relative overflow-hidden flex flex-col justify-between">
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 bg-emerald-500/10 px-2.5 py-1 rounded-full">Intermediate Section</span>
+                                  <span className={`text-[10px] font-bold flex items-center gap-1 ${isUnlocked ? "text-emerald-700 dark:text-emerald-300" : "text-amber-600"}`}>
+                                    {isUnlocked ? "● Accessible" : "○ Locked"}
+                                  </span>
+                                </div>
+                                <h3 className="text-sm font-bold text-emerald-950 dark:text-white">Al-Mutawassit Graduation Certificate</h3>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                  Awarded for proficiency in Tajweed Al-Qur'an, advanced Fiqh, and Prophetic Seerah.
+                                </p>
+                              </div>
+
+                              <div className="space-y-2 pt-2">
+                                <button
+                                  onClick={() => setActiveCertificate("intermediate")}
+                                  className={`w-full py-2 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                                    isUnlocked ? "bg-amber-500 hover:bg-amber-600 text-emerald-950" : "bg-emerald-700 hover:bg-emerald-800 text-white"
+                                  }`}
+                                >
+                                  🎓 View & Download Certificate
+                                </button>
+                              </div>
                             </div>
-                            <h3 className="text-base font-bold text-emerald-950 dark:text-white">Al-Mutawassit Graduation Certificate</h3>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                              Awarded to students achieving proficiency in Tajweed Al-Qur'an, advanced Fiqh studies, and Prophetic Seerah.
-                            </p>
-                          </div>
+                          );
+                        })()}
 
-                          <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-lg text-[10px] font-mono text-emerald-800 dark:text-emerald-400">
-                            <span className="font-bold block mb-1">UNLOX CONDITION:</span>
-                            Pass any Intermediate Level CBT Quiz with a score of 50% or higher.
-                          </div>
+                        {/* 3. Advance Section Certificate Card */}
+                        {(() => {
+                          const isUnlocked = passedAdvance || currentUser.isGraduated || currentUser.status === "graduated" || currentUser.level === "advance";
+                          return (
+                            <div className="bg-white dark:bg-emerald-900 rounded-2xl p-5 border border-emerald-150 dark:border-emerald-800 shadow-xs space-y-4 relative overflow-hidden flex flex-col justify-between">
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-700 bg-emerald-500/10 px-2.5 py-1 rounded-full">Advance Section</span>
+                                  <span className={`text-[10px] font-bold flex items-center gap-1 ${isUnlocked ? "text-emerald-700 dark:text-emerald-300" : "text-amber-600"}`}>
+                                    {isUnlocked ? "● Accessible" : "○ Locked"}
+                                  </span>
+                                </div>
+                                <h3 className="text-sm font-bold text-emerald-950 dark:text-white">Al-Mutaqaddim Graduation Certificate</h3>
+                                <p className="text-xs text-slate-500 leading-relaxed">
+                                  Highest academic honors for mastery in Usul al-Fiqh, Hadith terminology, and classical Arabic.
+                                </p>
+                              </div>
 
-                          {passedIntermediate ? (
-                            <button
-                              onClick={() => setActiveCertificate("intermediate")}
-                              className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer text-center"
-                            >
-                              🎓 View & Print Graduation Certificate
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              className="w-full py-2 bg-slate-100 dark:bg-slate-800/50 text-slate-400 font-bold text-xs rounded-lg cursor-not-allowed text-center"
-                            >
-                              🔒 Locked (Complete Intermediate CBT First)
-                            </button>
-                          )}
-                        </div>
+                              <div className="space-y-2 pt-2">
+                                <button
+                                  onClick={() => setActiveCertificate("advance")}
+                                  className={`w-full py-2 font-bold text-xs rounded-lg transition-all shadow-xs cursor-pointer text-center flex items-center justify-center gap-1.5 ${
+                                    isUnlocked ? "bg-amber-500 hover:bg-amber-600 text-emerald-950" : "bg-emerald-700 hover:bg-emerald-800 text-white"
+                                  }`}
+                                >
+                                  🎓 View & Download Certificate
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Gorgeous Printable Certificate Viewer Overlay */}
@@ -5891,10 +6114,13 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           <div className="bg-slate-50 rounded-2xl p-6 sm:p-8 max-w-4xl w-full space-y-6 shadow-2xl relative">
                             {/* Modal Header */}
                             <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-                              <h4 className="font-bold text-sm text-slate-800">Print Preview - Official Graduation Certificate</h4>
+                              <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                                <Award className="w-4 h-4 text-amber-500" />
+                                <span>Official Graduation Certificate - Preview</span>
+                              </h4>
                               <button
                                 onClick={() => setActiveCertificate(null)}
-                                className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-700 rounded-lg"
+                                className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-700 rounded-lg text-sm font-bold"
                               >
                                 ✕ Close
                               </button>
@@ -5922,7 +6148,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               {/* Title */}
                               <div className="text-center space-y-2">
                                 <div className="h-px bg-amber-500/30 w-1/3 mx-auto"></div>
-                                <h2 className="text-lg sm:text-xl font-serif text-amber-700 italic">Certificate of Achievement</h2>
+                                <h2 className="text-lg sm:text-xl font-serif text-amber-700 italic">Certificate of Achievement & Graduation</h2>
                                 <div className="h-px bg-amber-500/30 w-1/3 mx-auto"></div>
                               </div>
 
@@ -5936,7 +6162,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   has successfully passed all scheduled examinations, completed homework worksheets, and fulfilled the curriculum requirements for the
                                 </p>
                                 <p className="text-sm sm:text-base font-bold text-emerald-950 uppercase tracking-wider font-sans bg-emerald-500/5 py-1.5 px-4 rounded-full border border-emerald-100 inline-block">
-                                  {activeCertificate === "beginner" ? "Beginner Section (Al-Mubtadi’)" : "Intermediate Section (Al-Mutawassit)"}
+                                  {activeCertificate === "beginner" ? "Beginner Section (Al-Mubtadi’)" : activeCertificate === "intermediate" ? "Intermediate Section (Al-Mutawassit)" : "Advance Section (Al-Mutaqaddim)"}
                                 </p>
                                 <p className="font-light">
                                   of the official academic syllabus, showing upright character, perseverance, and dedication in pursuing Islamic knowledge.
@@ -5952,7 +6178,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 </div>
 
                                 <div className="flex justify-center items-center">
-                                  {/* Beautiful Golden Islamic Seal Ribbon SVG */}
+                                  {/* Golden Islamic Seal Ribbon SVG */}
                                   <div className="w-16 h-16 rounded-full bg-amber-500 flex items-center justify-center border-4 border-white shadow-md relative">
                                     <div className="w-12 h-12 rounded-full border-2 border-dashed border-amber-800 flex items-center justify-center text-[10px] font-bold text-amber-950 font-mono">
                                       SEAL
@@ -5969,20 +6195,37 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               </div>
                             </div>
 
-                            {/* Print Controls */}
-                            <div className="flex justify-end gap-3 pt-3">
-                              <button
-                                onClick={() => setActiveCertificate(null)}
-                                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
-                              >
-                                Close
-                              </button>
-                              <button
-                                onClick={() => window.print()}
-                                className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1.5"
-                              >
-                                🖨️ Print Certificate
-                              </button>
+                            {/* Download & Print Controls */}
+                            <div className="bg-emerald-50 dark:bg-emerald-950/60 p-4 rounded-xl border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                              <p className="text-xs text-emerald-800 dark:text-emerald-300 font-medium">
+                                🔔 Downloading or printing will automatically send a graduation verification alert to the Academy Admin.
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                                <button
+                                  onClick={() => setActiveCertificate(null)}
+                                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                                >
+                                  Close
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    notifyAdminCertificateDownload(activeCertificate);
+                                    handleDownloadCertificateImage(activeCertificate);
+                                  }}
+                                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                                >
+                                  📥 Download Image (.PNG)
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    notifyAdminCertificateDownload(activeCertificate);
+                                    window.print();
+                                  }}
+                                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1.5 shadow-xs"
+                                >
+                                  🖨️ Print / Save PDF
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -5997,6 +6240,33 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               {effectiveRole === "teacher" && (
                 <div className="space-y-6 animate-fade-in font-sans">
                   
+                  {/* Teacher Active Academic Term Banner */}
+                  <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white p-4 sm:p-5 rounded-2xl border border-emerald-700/60 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-amber-400 text-emerald-950 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full shadow-xs">
+                          FACULTY WORKSPACE
+                        </span>
+                        <span className="bg-emerald-950/80 text-amber-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                          🎓 Active Academic Term: {globalActiveSemester}
+                        </span>
+                      </div>
+                      <h2 className="text-base sm:text-lg font-serif font-bold text-amber-100">
+                        Welcome Ustadh, {currentUser.name}!
+                      </h2>
+                      <p className="text-xs text-emerald-200/90 leading-relaxed">
+                        You are actively grading worksheets, managing rosters, and taking attendance for <strong className="text-amber-300">{globalActiveSemester}</strong>.
+                      </p>
+                    </div>
+                    <div className="bg-emerald-950/80 px-3.5 py-2 rounded-xl border border-emerald-700/60 text-right shrink-0">
+                      <div className="text-[10px] uppercase font-bold text-emerald-300">Global Term Status</div>
+                      <div className="text-xs font-mono font-bold text-amber-300 flex items-center justify-end gap-1.5 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>{globalActiveSemester} LIVE</span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Teacher Sub-tab Navigation Pills */}
                   <div className="flex flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-800 pb-4">
                     <button
@@ -8304,6 +8574,67 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               {effectiveRole === "admin" && (
                 <div className="space-y-8 animate-fade-in">
                   
+                  {/* Admin Global Academic Session Switcher Banner */}
+                  <div className="bg-gradient-to-r from-emerald-900 via-emerald-850 to-emerald-950 text-white rounded-2xl p-5 border border-emerald-700/60 shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 bg-amber-400 text-emerald-950 text-[10px] font-black uppercase rounded-full tracking-wider shadow-xs">
+                          ADMINISTRATION CONTROL PANEL
+                        </span>
+                        <span className="text-xs font-mono text-emerald-200 bg-emerald-950/70 px-2.5 py-0.5 rounded-full border border-emerald-700/50">
+                          Active Term: <strong className="text-amber-300">{globalActiveSemester}</strong>
+                        </span>
+                      </div>
+                      <h2 className="text-lg font-serif font-bold text-amber-100 flex items-center gap-2">
+                        <span>📚 Academic Semester Switcher</span>
+                      </h2>
+                      <p className="text-xs text-emerald-200/90 leading-relaxed max-w-xl">
+                        Switching the active academic term updates curriculum schedules, exam trackers, and student dashboard banners globally across Student, Teacher, and Public Hero portals.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <div className="flex items-center bg-emerald-950/90 p-1.5 rounded-xl border border-emerald-700/80 shadow-inner">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActiveSemester("Semester 1")}
+                          disabled={activeSemesterSaving}
+                          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                            globalActiveSemester === "Semester 1"
+                              ? "bg-amber-400 text-emerald-950 shadow-md font-black"
+                              : "text-emerald-200 hover:text-white hover:bg-emerald-800/50"
+                          }`}
+                        >
+                          <span>📖 First Semester</span>
+                          {globalActiveSemester === "Semester 1" && <span className="text-[10px]">✓ ACTIVE</span>}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActiveSemester("Semester 2")}
+                          disabled={activeSemesterSaving}
+                          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                            globalActiveSemester === "Semester 2"
+                              ? "bg-amber-400 text-emerald-950 shadow-md font-black"
+                              : "text-emerald-200 hover:text-white hover:bg-emerald-800/50"
+                          }`}
+                        >
+                          <span>📘 Second Semester</span>
+                          {globalActiveSemester === "Semester 2" && <span className="text-[10px]">✓ ACTIVE</span>}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {semesterSuccessMsg && (
+                    <div className="bg-emerald-50 border-2 border-emerald-500/80 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 p-4 rounded-xl flex items-center justify-between gap-3 text-xs font-bold shadow-md animate-fade-in">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🎉</span>
+                        <span>{semesterSuccessMsg}</span>
+                      </div>
+                      <button onClick={() => setSemesterSuccessMsg("")} className="text-xs text-slate-500 hover:text-slate-800">✕</button>
+                    </div>
+                  )}
+
                   {/* Admin Navigation Pills */}
                   <div className="flex flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-800 pb-4">
                     <button
