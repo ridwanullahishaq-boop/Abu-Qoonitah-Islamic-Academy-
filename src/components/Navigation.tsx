@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { BookOpen, Search, Menu, X, Globe, Moon, Sun, ShieldAlert, Award, User, Heart } from "lucide-react";
+import WelcomeTicker from "./WelcomeTicker";
 
 interface NavigationProps {
   activePage: string;
@@ -71,7 +72,11 @@ export default function Navigation({
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white dark:bg-natural-dark border-b border-emerald-100 dark:border-natural-green shadow-sm transition-colors duration-200">
+    <header className="sticky top-0 z-50">
+      {/* Moving Welcome Ticker Banner */}
+      <WelcomeTicker isArabic={isArabic} />
+
+      <nav className="bg-white dark:bg-natural-dark border-b border-emerald-100 dark:border-natural-green shadow-sm transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20">
           {/* Logo & Academy Name */}
@@ -368,5 +373,6 @@ export default function Navigation({
         </div>
       )}
     </nav>
+    </header>
   );
 }
