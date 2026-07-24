@@ -1867,11 +1867,11 @@ app.get("/api/admin/students", authenticate, (req, res) => {
   res.json(students);
 });
 
-// Admin: Get all teachers
+// Admin / Student / Teacher: Get all teachers
 app.get("/api/admin/teachers", authenticate, (req, res) => {
   const userId = (req as any).userId;
   const user = db.users[userId];
-  if (!user || user.role !== "admin") {
+  if (!user) {
     res.status(403).json({ error: "Access denied." });
     return;
   }
@@ -1957,7 +1957,7 @@ app.post("/api/admin/students/:id/payment", authenticate, (req, res) => {
 });
 
 // Admin: Create student account manually
-app.post("/api/admin/students/create", authenticate, (req, res) => {
+app.post("/api/admin/students/create", authenticate, async (req, res) => {
   const adminId = (req as any).userId;
   const admin = db.users[adminId];
   if (!admin || (admin.role !== "admin" && admin.role !== "teacher")) {
@@ -1965,7 +1965,7 @@ app.post("/api/admin/students/create", authenticate, (req, res) => {
     return;
   }
 
-  const { username, password, name, email, level, isPaid } = req.body;
+  const { username, password, name, email, level, semester, teacherId, teacherName, isPaid } = req.body;
   if (!username || !password || !name || !email) {
     res.status(400).json({ error: "Username, password, name, and email are required." });
     return;
@@ -1988,8 +1988,12 @@ app.post("/api/admin/students/create", authenticate, (req, res) => {
     email,
     role: "student",
     level: level || "beginner",
+    semester: semester || "Semester 1",
+    teacherId: teacherId || "",
+    teacherName: teacherName || "",
+    assignedTeacherName: teacherName || "",
     isPaid: isPaid !== undefined ? Boolean(isPaid) : false,
-    enrolledCourses: level === "beginner" ? ["course-beg-1"] : (level === "intermediate" ? ["course-int-1"] : []),
+    enrolledCourses: level === "beginner" ? ["course-beg-1"] : (level === "intermediate" ? ["course-int-1"] : (level === "advanced" ? ["course-adv-1"] : [])),
     progress: {},
     attendance: {},
     createdAt: new Date().toISOString(),
@@ -1997,13 +2001,17 @@ app.post("/api/admin/students/create", authenticate, (req, res) => {
   };
 
   db.users[userId] = { ...newUser, passwordHash, salt };
-  saveDatabase();
-
-  res.json({ success: true, student: newUser });
+  try {
+    await saveDatabaseAsync();
+    res.json({ success: true, student: newUser });
+  } catch (err: any) {
+    delete db.users[userId];
+    res.status(500).json({ error: "Database save failed: " + err.message });
+  }
 });
 
-// Admin: Update student account details and credentials
-app.post("/api/admin/students/:id/update-credentials", authenticate, (req, res) => {
+// Admin: Update student account details, semester, level, and allocated teacher
+app.post("/api/admin/students/:id/update-credentials", authenticate, async (req, res) => {
   const adminId = (req as any).userId;
   const admin = db.users[adminId];
   if (!admin || (admin.role !== "admin" && admin.role !== "teacher")) {
@@ -2018,7 +2026,7 @@ app.post("/api/admin/students/:id/update-credentials", authenticate, (req, res) 
     return;
   }
 
-  const { username, password, name, email, level } = req.body;
+  const { username, password, name, email, level, semester, teacherId, teacherName, assignedTeacherName, isPaid } = req.body;
 
   if (username && username !== student.username) {
     const exists = Object.values(db.users).some(u => u.id !== studentId && u.username.toLowerCase() === username.toLowerCase());
@@ -2039,12 +2047,129 @@ app.post("/api/admin/students/:id/update-credentials", authenticate, (req, res) 
   if (name) student.name = name;
   if (email) student.email = email;
   if (level) student.level = level;
+  if (semester !== undefined) student.semester = semester;
+  if (teacherId !== undefined) student.teacherId = teacherId;
+  if (teacherName !== undefined) {
+    student.teacherName = teacherName;
+    student.assignedTeacherName = teacherName;
+  }
+  if (assignedTeacherName !== undefined) {
+    student.assignedTeacherName = assignedTeacherName;
+    if (!student.teacherName) student.teacherName = assignedTeacherName;
+  }
+  if (isPaid !== undefined) student.isPaid = Boolean(isPaid);
 
   db.users[studentId] = student;
-  saveDatabase();
+  try {
+    await saveDatabaseAsync();
+    const { passwordHash, salt: s, ...safeStudent } = student;
+    res.json({ success: true, student: safeStudent });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update student: " + err.message });
+  }
+});
 
-  const { passwordHash, salt: s, ...safeStudent } = student;
-  res.json({ success: true, student: safeStudent });
+// Admin: Create Teacher account
+app.post("/api/admin/teachers/create", authenticate, async (req, res) => {
+  const adminId = (req as any).userId;
+  const admin = db.users[adminId];
+  if (!admin || admin.role !== "admin") {
+    res.status(403).json({ error: "Access denied." });
+    return;
+  }
+
+  const { username, password, name, email, assignedClass, subjects, qualification, bio } = req.body;
+  if (!username || !password || !name || !email) {
+    res.status(400).json({ error: "Username, password, name, and email are required." });
+    return;
+  }
+
+  const exists = Object.values(db.users).some(u => u.username.toLowerCase() === username.toLowerCase());
+  if (exists) {
+    res.status(400).json({ error: "Username already exists." });
+    return;
+  }
+
+  const userId = "teacher-" + crypto.randomBytes(8).toString("hex");
+  const salt = generateSalt();
+  const passwordHash = hashPassword(password, salt);
+
+  const newTeacher: any = {
+    id: userId,
+    username,
+    name,
+    email,
+    role: "teacher",
+    assignedClass: assignedClass || "beginner",
+    subjects: subjects || "Islamic Studies & Creed",
+    qualification: qualification || "B.A. Islamic Studies",
+    bio: bio || "Dedicated Ustadh at Abu Qoonitah Academy.",
+    enrolledCourses: [],
+    progress: {},
+    attendance: {},
+    createdAt: new Date().toISOString(),
+    plainPassword: password
+  };
+
+  db.users[userId] = { ...newTeacher, passwordHash, salt };
+  try {
+    await saveDatabaseAsync();
+    res.json({ success: true, teacher: newTeacher });
+  } catch (err: any) {
+    delete db.users[userId];
+    res.status(500).json({ error: "Database save failed: " + err.message });
+  }
+});
+
+// Admin: Update Teacher details & allocated class level
+app.post("/api/admin/teachers/:id/update", authenticate, async (req, res) => {
+  const adminId = (req as any).userId;
+  const admin = db.users[adminId];
+  if (!admin || admin.role !== "admin") {
+    res.status(403).json({ error: "Access denied." });
+    return;
+  }
+
+  const teacherId = req.params.id;
+  const teacher = db.users[teacherId];
+  if (!teacher || teacher.role !== "teacher") {
+    res.status(404).json({ error: "Teacher not found." });
+    return;
+  }
+
+  const { name, email, assignedClass, subjects, qualification, bio, username, password } = req.body;
+
+  if (username && username !== teacher.username) {
+    const exists = Object.values(db.users).some(u => u.id !== teacherId && u.username.toLowerCase() === username.toLowerCase());
+    if (exists) {
+      res.status(400).json({ error: "Username already exists." });
+      return;
+    }
+    teacher.username = username;
+  }
+
+  if (password) {
+    const salt = generateSalt();
+    teacher.salt = salt;
+    teacher.passwordHash = hashPassword(password, salt);
+    teacher.plainPassword = password;
+  }
+
+  if (name) teacher.name = name;
+  if (email) teacher.email = email;
+  if (assignedClass !== undefined) teacher.assignedClass = assignedClass;
+  if (subjects !== undefined) teacher.subjects = subjects;
+  if (qualification !== undefined) teacher.qualification = qualification;
+  if (bio !== undefined) teacher.bio = bio;
+
+  db.users[teacherId] = teacher;
+  try {
+    await saveDatabaseAsync();
+    const { passwordHash, salt: s, ...safeTeacher } = teacher;
+    res.json({ success: true, teacher: safeTeacher });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update teacher: " + err.message });
+  }
 });
 
 // Teacher/Admin: Log attendance for student

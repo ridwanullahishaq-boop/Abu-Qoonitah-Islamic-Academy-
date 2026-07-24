@@ -79,8 +79,8 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   // Dashboard Sub-tabs
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [adminSubTab, setAdminSubTab] = useState<string>("payments");
-  const [studentSubTab, setStudentSubTab] = useState<"courses" | "assignments" | "announcements" | "payments" | "results" | "certificates">("courses");
-  const [teacherSubTab, setTeacherSubTab] = useState<"tracker" | "grading" | "attendance" | "announcements" | "curriculum" | "admissions">("tracker");
+  const [studentSubTab, setStudentSubTab] = useState<"courses" | "assignments" | "announcements" | "payments" | "results" | "certificates" | "myTeacher">("courses");
+  const [teacherSubTab, setTeacherSubTab] = useState<"tracker" | "grading" | "attendance" | "announcements" | "curriculum" | "admissions" | "myStudents">("tracker");
 
   // --- Teacher Registration states ---
   const [tchName, setTchName] = useState("");
@@ -397,6 +397,9 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [editStudentUsername, setEditStudentUsername] = useState("");
   const [editStudentPassword, setEditStudentPassword] = useState("");
   const [editStudentLevel, setEditStudentLevel] = useState<'beginner' | 'intermediate' | 'advanced'>("beginner");
+  const [editStudentSemester, setEditStudentSemester] = useState("Semester 1");
+  const [editStudentTeacherId, setEditStudentTeacherId] = useState("");
+  const [editStudentTeacherName, setEditStudentTeacherName] = useState("");
   const [editStudentSuccessMsg, setEditStudentSuccessMsg] = useState("");
   const [editStudentErrorMsg, setEditStudentErrorMsg] = useState("");
 
@@ -406,6 +409,9 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [addStudentUsername, setAddStudentUsername] = useState("");
   const [addStudentPassword, setAddStudentPassword] = useState("");
   const [addStudentLevel, setAddStudentLevel] = useState<'beginner' | 'intermediate' | 'advanced'>("beginner");
+  const [addStudentSemester, setAddStudentSemester] = useState("Semester 1");
+  const [addStudentTeacherId, setAddStudentTeacherId] = useState("");
+  const [addStudentTeacherName, setAddStudentTeacherName] = useState("");
   const [addStudentIsPaid, setAddStudentIsPaid] = useState(false);
   const [addStudentSuccessMsg, setAddStudentSuccessMsg] = useState("");
   const [addStudentErrorMsg, setAddStudentErrorMsg] = useState("");
@@ -540,7 +546,7 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
           .catch((err) => console.error(err));
       }
 
-      if (currentUser.role === "admin") {
+      if (currentUser) {
         fetch("/api/admin/teachers", { headers })
           .then((res) => res.json())
           .then((data) => setAllTeachers(data))
@@ -558,6 +564,9 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
         setEditStudentEmail(s.email || "");
         setEditStudentUsername(s.username || "");
         setEditStudentLevel(s.level || "beginner");
+        setEditStudentSemester(s.semester || "Semester 1");
+        setEditStudentTeacherId(s.teacherId || "");
+        setEditStudentTeacherName(s.teacherName || s.assignedTeacherName || "");
         setEditStudentPassword("");
         setIsEditingStudentCredentials(false);
         setEditStudentSuccessMsg("");
@@ -914,6 +923,15 @@ Please keep this secure.`;
 
   // Enroll Student to Course
   const handleEnroll = (courseId: string) => {
+    const courseObj = courses.find(c => c.id === courseId);
+    if (courseObj && currentUser && currentUser.role === "student") {
+      const studentLevel = currentUser.level || "beginner";
+      if (courseObj.level !== "free" && courseObj.level !== studentLevel) {
+        alert(`Access Restricted: You are classified as a ${studentLevel.toUpperCase()} level student. You can only enroll in ${studentLevel.toUpperCase()} level courses. Please contact administration if you wish to upgrade your level.`);
+        return;
+      }
+    }
+
     const token = localStorage.getItem("token") || "";
     fetch("/api/courses/enroll", {
       method: "POST",
@@ -1607,6 +1625,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
         username: addStudentUsername,
         password: addStudentPassword,
         level: addStudentLevel,
+        semester: addStudentSemester,
+        teacherId: addStudentTeacherId,
+        teacherName: addStudentTeacherName,
+        assignedTeacherName: addStudentTeacherName,
         isPaid: addStudentIsPaid
       })
     })
@@ -1624,6 +1646,9 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
         setAddStudentUsername("");
         setAddStudentPassword("");
         setAddStudentLevel("beginner");
+        setAddStudentSemester("Semester 1");
+        setAddStudentTeacherId("");
+        setAddStudentTeacherName("");
         setAddStudentIsPaid(false);
         fetchAdmissionList();
       })
@@ -1648,7 +1673,11 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
         email: editStudentEmail,
         username: editStudentUsername,
         password: editStudentPassword || undefined,
-        level: editStudentLevel
+        level: editStudentLevel,
+        semester: editStudentSemester,
+        teacherId: editStudentTeacherId,
+        teacherName: editStudentTeacherName,
+        assignedTeacherName: editStudentTeacherName
       })
     })
       .then(async (res) => {
@@ -4116,6 +4145,16 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       📚 Enrolled Classes & Lectures
                     </button>
                     <button
+                      onClick={() => { setStudentSubTab("myTeacher"); setSelectedCourse(null); }}
+                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                        studentSubTab === "myTeacher"
+                          ? "bg-emerald-700 text-white shadow-sm"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                      }`}
+                    >
+                      👳‍♂️ My Assigned Teacher
+                    </button>
+                    <button
                       onClick={() => { setStudentSubTab("assignments"); setSelectedCourse(null); }}
                       className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
                         studentSubTab === "assignments"
@@ -4166,6 +4205,181 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       🎓 Graduation Certificates
                     </button>
                   </div>
+
+                  {/* Student Academic Status Banner */}
+                  <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-emerald-700/50 flex flex-col md:flex-row md:items-center justify-between gap-4 font-sans">
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="bg-amber-400 text-emerald-950 text-[11px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider shadow-xs">
+                          {(currentUser.level || 'beginner').toUpperCase()} TRACK
+                        </span>
+                        <span className="bg-emerald-950/80 text-amber-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                          📚 {currentUser.semester || 'Semester 1'}
+                        </span>
+                        {currentUser.isPaid ? (
+                          <span className="bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
+                            ✓ Tuition Active
+                          </span>
+                        ) : (
+                          <span className="bg-amber-500/20 text-amber-300 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-amber-400/30">
+                            ⚠️ Tuition Pending
+                          </span>
+                        )}
+                      </div>
+                      <h1 className="text-xl sm:text-2xl font-serif font-bold text-amber-100">
+                        Assalamu Alaikum, {currentUser.name}!
+                      </h1>
+                      <p className="text-xs text-emerald-200/90 max-w-xl leading-relaxed">
+                        You are enrolled as a <strong className="text-amber-300 capitalize">{currentUser.level || 'beginner'}</strong> level student in <strong className="text-amber-300">{currentUser.semester || 'Semester 1'}</strong>. You have exclusive access to all <span className="capitalize text-amber-300">{currentUser.level || 'beginner'}</span> level courses and assigned lectures.
+                      </p>
+                    </div>
+
+                    {/* Teacher Quick Badge */}
+                    {(() => {
+                      const assignedTch = allTeachers.find(t => t.id === currentUser.teacherId || t.name === currentUser.teacherName || t.name === currentUser.assignedTeacherName) ||
+                        allTeachers.find(t => t.assignedClass === currentUser.level);
+                      const teacherName = assignedTch ? assignedTch.name : (currentUser.teacherName || currentUser.assignedTeacherName || "Senior Madrasah Faculty");
+                      
+                      return (
+                        <div className="bg-emerald-950/70 p-3.5 rounded-xl border border-emerald-600/40 min-w-[240px] shrink-0">
+                          <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Assigned Instructor</div>
+                          <div className="font-bold text-sm text-white flex items-center gap-2 mt-0.5">
+                            <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span className="truncate">{teacherName}</span>
+                          </div>
+                          <div className="text-[11px] text-emerald-200 mt-1 flex items-center justify-between">
+                            <span className="truncate max-w-[140px]">{assignedTch?.subjects || "Islamic Studies"}</span>
+                            <button 
+                              onClick={() => { setStudentSubTab("myTeacher"); setSelectedCourse(null); }}
+                              className="text-[10px] text-amber-300 hover:underline font-bold cursor-pointer"
+                            >
+                              View Profile →
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* SUB-TAB: MY ASSIGNED TEACHER */}
+                  {studentSubTab === "myTeacher" && (
+                    <div className="space-y-6 font-sans">
+                      {(() => {
+                        const assignedTch = allTeachers.find(t => t.id === currentUser.teacherId || t.name === currentUser.teacherName || t.name === currentUser.assignedTeacherName) ||
+                          allTeachers.find(t => t.assignedClass === currentUser.level);
+
+                        if (!assignedTch) {
+                          return (
+                            <div className="bg-white dark:bg-emerald-900 rounded-xl p-8 border border-emerald-100 dark:border-emerald-800 text-center space-y-4">
+                              <div className="w-16 h-16 bg-amber-500/10 text-amber-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+                                👳‍♂️
+                              </div>
+                              <div className="space-y-1">
+                                <h3 className="text-lg font-bold text-emerald-950 dark:text-amber-100">Senior Madrasah Faculty</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-300 max-w-md mx-auto">
+                                  You are currently assigned under the Senior Academic Faculty for the <strong>{(currentUser.level || 'beginner').toUpperCase()}</strong> track ({currentUser.semester || 'Semester 1'}). Your direct mentor will appear here once allocated by Administration.
+                                </p>
+                              </div>
+                              {allTeachers.length > 0 && (
+                                <div className="pt-4 border-t border-emerald-100 dark:border-emerald-800">
+                                  <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Available Academy Instructors</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                                    {allTeachers.map((t) => (
+                                      <div key={t.id} className="p-4 bg-emerald-50/30 dark:bg-emerald-950/40 rounded-xl border border-emerald-100 dark:border-emerald-800 flex items-start gap-3">
+                                        <div className="w-10 h-10 bg-emerald-700 text-amber-300 font-bold rounded-full flex items-center justify-center text-sm shrink-0">
+                                          {t.name.charAt(0)}
+                                        </div>
+                                        <div>
+                                          <div className="font-bold text-sm text-emerald-950 dark:text-amber-100">{t.name}</div>
+                                          <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">{t.subjects || "Islamic Studies"}</div>
+                                          <div className="text-[10px] text-slate-400 mt-1">{t.qualification || "Faculty Member"}</div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="bg-white dark:bg-emerald-900 rounded-2xl p-6 sm:p-8 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-6">
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-b border-emerald-100 dark:border-emerald-800 pb-6">
+                              <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-emerald-800 to-teal-900 text-amber-300 font-bold rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-md border-2 border-amber-400/40 shrink-0">
+                                  {assignedTch.name.charAt(0)}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                                      Your Assigned Ustadh
+                                    </span>
+                                    <span className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full">
+                                      {(assignedTch.assignedClass || 'all').toUpperCase()} CLASS
+                                    </span>
+                                  </div>
+                                  <h2 className="text-xl sm:text-2xl font-serif font-bold text-emerald-950 dark:text-amber-100 mt-1">
+                                    {assignedTch.name}
+                                  </h2>
+                                  <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5">
+                                    {assignedTch.qualification || "Senior Islamic Studies Scholar"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => {
+                                  setActiveTab("messages");
+                                  setSelectedRecipient(assignedTch);
+                                }}
+                                className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-2 cursor-pointer transition-all"
+                              >
+                                <MessageSquare className="w-4 h-4 text-amber-300" />
+                                <span>Send Direct Message</span>
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="p-4 bg-emerald-50/40 dark:bg-emerald-950/40 rounded-xl border border-emerald-100 dark:border-emerald-800/80 space-y-2">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-amber-300 flex items-center gap-1.5">
+                                  <BookOpen className="w-4 h-4 text-amber-500" />
+                                  <span>Specialized Subjects & Focus</span>
+                                </h4>
+                                <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
+                                  {assignedTch.subjects || "Aqeedah, Tajweed, Fiqh, Hadith Sciences, and Arabic Language"}
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-emerald-50/40 dark:bg-emerald-950/40 rounded-xl border border-emerald-100 dark:border-emerald-800/80 space-y-2">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-amber-300 flex items-center gap-1.5">
+                                  <Mail className="w-4 h-4 text-amber-500" />
+                                  <span>Instructor Contact Details</span>
+                                </h4>
+                                <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-mono">
+                                  Email: {assignedTch.email || "teacher@abuqoonitah.org"}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  Office Hours: Monday - Friday (After Asr - Isha)
+                                </p>
+                              </div>
+                            </div>
+
+                            {assignedTch.bio && (
+                              <div className="p-4 bg-slate-50 dark:bg-emerald-950/30 rounded-xl border border-slate-200 dark:border-emerald-800/60 space-y-1.5">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                  Biography & Advice to Students
+                                </h4>
+                                <p className="text-xs text-slate-650 dark:text-emerald-200/90 leading-relaxed italic">
+                                  "{assignedTch.bio}"
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* SUB-TAB 1: ENROLLED COURSES & CLASSROOM */}
                   {studentSubTab === "courses" && (
@@ -5495,6 +5709,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       <span>Student Roster & Progress</span>
                     </button>
                     <button
+                      onClick={() => setTeacherSubTab("myStudents")}
+                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                        teacherSubTab === "myStudents"
+                          ? "bg-emerald-700 text-white shadow-sm"
+                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                      }`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5 text-amber-300" />
+                      <span>My Allocated Students</span>
+                    </button>
+                    <button
                       onClick={() => setTeacherSubTab("grading")}
                       className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === "grading"
@@ -5550,6 +5775,111 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       <span>Admission Credentials List</span>
                     </button>
                   </div>
+
+                  {/* SUB-TAB: MY ALLOCATED STUDENTS */}
+                  {teacherSubTab === "myStudents" && (
+                    <div className="space-y-6 font-sans">
+                      {(() => {
+                        const myStudentsList = allStudents.filter(s =>
+                          s.teacherId === currentUser.id ||
+                          s.teacherName === currentUser.name ||
+                          s.assignedTeacherName === currentUser.name ||
+                          (currentUser.assignedClass && currentUser.assignedClass !== 'all' && s.level === currentUser.assignedClass) ||
+                          currentUser.assignedClass === 'all'
+                        );
+
+                        return (
+                          <div className="bg-white dark:bg-emerald-900 rounded-2xl p-6 sm:p-8 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-emerald-100 dark:border-emerald-800 pb-4">
+                              <div>
+                                <h3 className="text-lg font-serif font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2">
+                                  <UserCheck className="w-5 h-5 text-amber-500" />
+                                  <span>My Allocated Students ({myStudentsList.length})</span>
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5">
+                                  Students directly allocated to you or in your <strong>{(currentUser.assignedClass || 'all').toUpperCase()}</strong> class track.
+                                </p>
+                              </div>
+
+                              <div className="bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1.5 rounded-lg border border-emerald-100 dark:border-emerald-800 text-xs font-bold text-emerald-900 dark:text-amber-300">
+                                Ustadh: {currentUser.name}
+                              </div>
+                            </div>
+
+                            {myStudentsList.length === 0 ? (
+                              <div className="p-8 bg-slate-50 dark:bg-emerald-950/30 rounded-xl text-center space-y-2 border border-slate-200 dark:border-emerald-800">
+                                <Users className="w-10 h-10 text-slate-300 mx-auto" />
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">No students allocated to your profile yet.</p>
+                                <p className="text-[11px] text-slate-400">Administration can assign students to your profile from the Admin Admissions tab.</p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {myStudentsList.map((st) => (
+                                  <div
+                                    key={st.id}
+                                    className="p-5 bg-emerald-50/20 dark:bg-emerald-950/40 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-3 flex flex-col justify-between"
+                                  >
+                                    <div className="space-y-2">
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <h4 className="font-bold text-sm text-emerald-950 dark:text-amber-100">{st.name}</h4>
+                                          <div className="text-[10px] text-slate-400 font-mono">@{st.username}</div>
+                                        </div>
+                                        <span className="bg-emerald-500/15 text-emerald-700 dark:text-amber-300 font-bold text-[9px] uppercase px-2 py-0.5 rounded">
+                                          {st.level}
+                                        </span>
+                                      </div>
+
+                                      <div className="space-y-1 text-xs pt-1 border-t border-emerald-100 dark:border-emerald-800">
+                                        <div className="flex justify-between text-[11px]">
+                                          <span className="text-slate-400 font-bold">Academic Semester:</span>
+                                          <span className="font-bold text-amber-600 dark:text-amber-400">{st.semester || "Semester 1"}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[11px]">
+                                          <span className="text-slate-400 font-bold">Email:</span>
+                                          <span className="font-mono text-slate-650 dark:text-slate-300 truncate max-w-[140px]">{st.email}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[11px]">
+                                          <span className="text-slate-400 font-bold">Tuition Clearance:</span>
+                                          {st.isPaid ? (
+                                            <span className="text-emerald-600 font-bold">✓ Active</span>
+                                          ) : (
+                                            <span className="text-amber-600 font-bold">⚠️ Pending</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-emerald-100 dark:border-emerald-800 flex gap-2">
+                                      <button
+                                        onClick={() => {
+                                          setActiveTab("messages");
+                                          setSelectedRecipient(st);
+                                        }}
+                                        className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1"
+                                      >
+                                        <MessageSquare className="w-3.5 h-3.5 text-amber-300" />
+                                        <span>Send DM</span>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setSelectedStudentDetailsId(st.id);
+                                          setTeacherSubTab("tracker");
+                                        }}
+                                        className="py-1.5 px-3 bg-amber-500 hover:bg-amber-600 text-emerald-950 rounded-lg text-xs font-bold cursor-pointer transition-all"
+                                      >
+                                        Logs
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* SUB-TAB 1: STUDENT ROSTER & DETAILS TRACKER */}
                   {teacherSubTab === "tracker" && (
@@ -5676,6 +6006,41 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                     <option value="advanced">Advanced (Mutaqaddim)</option>
                                   </select>
                                 </div>
+                                <div className="space-y-1">
+                                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Academic Semester</label>
+                                  <select
+                                    value={addStudentSemester}
+                                    onChange={(e) => setAddStudentSemester(e.target.value)}
+                                    className="w-full bg-white dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 dark:text-white font-sans"
+                                  >
+                                    <option value="Semester 1">Semester 1</option>
+                                    <option value="Semester 2">Semester 2</option>
+                                    <option value="Semester 3">Semester 3</option>
+                                    <option value="Semester 4">Semester 4</option>
+                                    <option value="Semester 5">Semester 5</option>
+                                    <option value="Semester 6">Semester 6</option>
+                                  </select>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Assigned Ustadh / Teacher</label>
+                                  <select
+                                    value={addStudentTeacherId}
+                                    onChange={(e) => {
+                                      const selId = e.target.value;
+                                      setAddStudentTeacherId(selId);
+                                      const tchObj = allTeachers.find(t => t.id === selId);
+                                      setAddStudentTeacherName(tchObj ? tchObj.name : "");
+                                    }}
+                                    className="w-full bg-white dark:bg-emerald-900/40 border border-emerald-100 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 dark:text-white font-sans"
+                                  >
+                                    <option value="">-- Unassigned (Senior Faculty) --</option>
+                                    {allTeachers.map((t) => (
+                                      <option key={t.id} value={t.id}>
+                                        {t.name} ({(t.assignedClass || 'all').toUpperCase()})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
                                 <div className="space-y-1 flex flex-col justify-end">
                                   <label className="flex items-center gap-2 cursor-pointer py-2 font-sans select-none">
                                     <input
@@ -5717,49 +6082,60 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 <tr className="bg-emerald-50 dark:bg-emerald-950 text-emerald-900 dark:text-amber-100 border-b border-emerald-100">
                                   <th className="p-3 font-bold">Student</th>
                                   <th className="p-3 font-bold">Class Level</th>
+                                  <th className="p-3 font-bold">Semester</th>
+                                  <th className="p-3 font-bold">Assigned Teacher</th>
                                   <th className="p-3 font-bold">Financial Clearance</th>
                                   <th className="p-3 font-bold text-center">Action</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {allStudents.map((student) => (
-                                  <tr
-                                    key={student.id}
-                                    className={`border-b border-emerald-50/10 hover:bg-emerald-50/10 text-emerald-800 dark:text-emerald-200 cursor-pointer ${
-                                      selectedStudentDetailsId === student.id ? "bg-emerald-50/30 dark:bg-emerald-950/25" : ""
-                                    }`}
-                                    onClick={() => setSelectedStudentDetailsId(student.id)}
-                                  >
-                                    <td className="p-3">
-                                      <div className="font-semibold">{student.name}</div>
-                                      <div className="text-[10px] text-slate-400 font-mono">{student.email}</div>
-                                    </td>
-                                    <td className="p-3">
-                                      <span className="uppercase text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-amber-400 px-2 py-0.5 rounded">
-                                        {student.level}
-                                      </span>
-                                    </td>
-                                    <td className="p-3">
-                                      {student.isPaid ? (
-                                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/15 px-2 py-0.5 rounded flex items-center gap-1 w-max">
-                                          <CheckCircle2 className="w-3 h-3" /> Clear
+                                {allStudents.map((student) => {
+                                  const tch = allTeachers.find(t => t.id === student.teacherId || t.name === student.teacherName || t.name === student.assignedTeacherName);
+                                  return (
+                                    <tr
+                                      key={student.id}
+                                      className={`border-b border-emerald-50/10 hover:bg-emerald-50/10 text-emerald-800 dark:text-emerald-200 cursor-pointer ${
+                                        selectedStudentDetailsId === student.id ? "bg-emerald-50/30 dark:bg-emerald-950/25" : ""
+                                      }`}
+                                      onClick={() => setSelectedStudentDetailsId(student.id)}
+                                    >
+                                      <td className="p-3">
+                                        <div className="font-semibold">{student.name}</div>
+                                        <div className="text-[10px] text-slate-400 font-mono">{student.email}</div>
+                                      </td>
+                                      <td className="p-3">
+                                        <span className="uppercase text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-amber-400 px-2 py-0.5 rounded">
+                                          {student.level}
                                         </span>
-                                      ) : (
-                                        <span className="text-[10px] font-bold text-amber-600 bg-amber-500/15 px-2 py-0.5 rounded flex items-center gap-1 w-max">
-                                          <Lock className="w-3 h-3" /> Locked
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="p-3 text-center">
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); setSelectedStudentDetailsId(student.id); }}
-                                        className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold cursor-pointer"
-                                      >
-                                        View Log
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
+                                      </td>
+                                      <td className="p-3 font-bold text-[11px] text-amber-600 dark:text-amber-300">
+                                        {student.semester || "Semester 1"}
+                                      </td>
+                                      <td className="p-3 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                                        {tch ? tch.name : (student.teacherName || student.assignedTeacherName || "Senior Faculty")}
+                                      </td>
+                                      <td className="p-3">
+                                        {student.isPaid ? (
+                                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-500/15 px-2 py-0.5 rounded flex items-center gap-1 w-max">
+                                            <CheckCircle2 className="w-3 h-3" /> Clear
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] font-bold text-amber-600 bg-amber-500/15 px-2 py-0.5 rounded flex items-center gap-1 w-max">
+                                            <Lock className="w-3 h-3" /> Locked
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="p-3 text-center">
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); setSelectedStudentDetailsId(student.id); }}
+                                          className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[10px] font-bold cursor-pointer"
+                                        >
+                                          View Log
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
@@ -5861,6 +6237,41 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                           <option value="beginner">Beginner (Mubtadi')</option>
                                           <option value="intermediate">Intermediate (Mutawassit)</option>
                                           <option value="advanced">Advanced (Mutaqaddim)</option>
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Current Academic Semester</label>
+                                        <select
+                                          value={editStudentSemester}
+                                          onChange={(e) => setEditStudentSemester(e.target.value)}
+                                          className="w-full bg-white dark:bg-emerald-900 border border-slate-200 dark:border-emerald-800 rounded p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 dark:text-white font-sans font-bold text-amber-600"
+                                        >
+                                          <option value="Semester 1">Semester 1</option>
+                                          <option value="Semester 2">Semester 2</option>
+                                          <option value="Semester 3">Semester 3</option>
+                                          <option value="Semester 4">Semester 4</option>
+                                          <option value="Semester 5">Semester 5</option>
+                                          <option value="Semester 6">Semester 6</option>
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Assigned Ustadh / Teacher</label>
+                                        <select
+                                          value={editStudentTeacherId}
+                                          onChange={(e) => {
+                                            const selId = e.target.value;
+                                            setEditStudentTeacherId(selId);
+                                            const tchObj = allTeachers.find(t => t.id === selId);
+                                            setEditStudentTeacherName(tchObj ? tchObj.name : "");
+                                          }}
+                                          className="w-full bg-white dark:bg-emerald-900 border border-slate-200 dark:border-emerald-800 rounded p-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 dark:text-white font-sans font-bold text-emerald-700 dark:text-amber-300"
+                                        >
+                                          <option value="">-- Unassigned (Senior Faculty) --</option>
+                                          {allTeachers.map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                              {t.name} ({(t.assignedClass || 'all').toUpperCase()})
+                                            </option>
+                                          ))}
                                         </select>
                                       </div>
                                     </div>

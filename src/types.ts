@@ -12,6 +12,10 @@ export interface User {
   email: string;
   role: UserRole;
   level?: 'beginner' | 'intermediate' | 'advanced';
+  semester?: string;
+  teacherId?: string;
+  teacherName?: string;
+  assignedTeacherName?: string;
   isPaid?: boolean;
   enrolledCourses: string[]; // Course IDs
   progress: Record<string, number>; // CourseID -> percentage completed (0-100)

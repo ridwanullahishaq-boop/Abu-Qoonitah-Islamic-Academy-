@@ -629,9 +629,50 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
 
   if (path === "/api/admin/teachers" && method === "GET") {
     const user = getAuthorizedUser() as any;
-    if (!user || user.role !== "admin") return mockResponse({ error: "Unauthorized" }, 403);
+    if (!user) return mockResponse({ error: "Unauthorized" }, 403);
     const list = Object.values(clientDb.users).filter((u: any) => u.role === "teacher");
     return mockResponse(list);
+  }
+
+  if (path === "/api/admin/teachers/create" && method === "POST") {
+    if (!adminCheck()) return mockResponse({ error: "Unauthorized" }, 403);
+    const { username, password, name, email, assignedClass, subjects, qualification, bio } = body || {};
+    const userId = generateId("teacher");
+    const newTeacher = {
+      id: userId,
+      username,
+      name,
+      email,
+      role: "teacher",
+      assignedClass: assignedClass || "beginner",
+      subjects: subjects || "Islamic Studies",
+      qualification: qualification || "B.A. Islamic Studies",
+      bio: bio || "Ustadh at Abu Qoonitah Academy.",
+      plainPassword: password
+    };
+    clientDb.users[userId] = newTeacher;
+    await saveDbToSupabase();
+    return mockResponse({ success: true, teacher: newTeacher });
+  }
+
+  if (path.startsWith("/api/admin/teachers/") && path.endsWith("/update") && method === "POST") {
+    if (!adminCheck()) return mockResponse({ error: "Unauthorized" }, 403);
+    const tId = path.split("/")[4];
+    const { name, email, assignedClass, subjects, qualification, bio, username, password } = body || {};
+    const teacher = clientDb.users[tId];
+    if (!teacher) return mockResponse({ error: "Teacher not found" }, 404);
+
+    if (name) teacher.name = name;
+    if (email) teacher.email = email;
+    if (username) teacher.username = username;
+    if (password) teacher.plainPassword = password;
+    if (assignedClass !== undefined) teacher.assignedClass = assignedClass;
+    if (subjects !== undefined) teacher.subjects = subjects;
+    if (qualification !== undefined) teacher.qualification = qualification;
+    if (bio !== undefined) teacher.bio = bio;
+
+    await saveDbToSupabase();
+    return mockResponse({ success: true, teacher });
   }
 
   if (path === "/api/admin/admission-list" && method === "GET") {
@@ -689,11 +730,26 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
   if (path.startsWith("/api/admin/students/") && path.endsWith("/update-credentials") && method === "POST") {
     if (!adminCheck()) return mockResponse({ error: "Unauthorized" }, 403);
     const studId = path.split("/")[4];
-    const { username, password } = body || {};
+    const { username, password, name, email, level, semester, teacherId, teacherName, assignedTeacherName, isPaid } = body || {};
     const stud = clientDb.users[studId];
     if (!stud) return mockResponse({ error: "User not found" }, 404);
 
     if (username) stud.username = username;
+    if (name) stud.name = name;
+    if (email) stud.email = email;
+    if (level) stud.level = level;
+    if (semester !== undefined) stud.semester = semester;
+    if (teacherId !== undefined) stud.teacherId = teacherId;
+    if (teacherName !== undefined) {
+      stud.teacherName = teacherName;
+      stud.assignedTeacherName = teacherName;
+    }
+    if (assignedTeacherName !== undefined) {
+      stud.assignedTeacherName = assignedTeacherName;
+      if (!stud.teacherName) stud.teacherName = assignedTeacherName;
+    }
+    if (isPaid !== undefined) stud.isPaid = Boolean(isPaid);
+
     if (password) {
       stud.plainPassword = password;
       const salt = Array.from(window.crypto.getRandomValues(new Uint8Array(16)))
@@ -704,7 +760,7 @@ async function handleMockRequest(url: string, init?: RequestInit): Promise<Respo
     }
 
     await saveDbToSupabase();
-    return mockResponse({ success: true, user: stud });
+    return mockResponse({ success: true, student: stud, user: stud });
   }
 
   if (path === "/api/admin/books/add" && method === "POST") {
