@@ -10,6 +10,7 @@ import {
   ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive, CreditCard
 } from "lucide-react";
 import { AutoSaveBadge, useAutoSave, AutoSaveNotesVault } from "./AutoSaveManager";
+import { getEmbedVideoUrl, isGoogleDriveUrl } from "../utils/videoUtils";
 
 interface LMSPortalProps {
   isArabic: boolean;
@@ -4366,8 +4367,26 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             )}
                           </div>
                           <p className="text-[10px] leading-snug">{n.message}</p>
-                          <div className="text-[8px] text-slate-400 dark:text-slate-500 text-right">
-                            {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-emerald-800/50 mt-1">
+                            <a
+                              href={
+                                n.whatsappUrl ||
+                                `https://wa.me/2348122455759?text=${encodeURIComponent(
+                                  `As-salamu alaykum.\n\n📢 *Abu Qoonitah Academy Alert*\n*${n.title}*\n\n${n.message}\n\n— Sent from Abu Qoonitah Islamic Academy Portal`
+                                )}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[9px] font-bold shadow-xs transition-colors cursor-pointer"
+                              title="Send / Forward this alert directly on WhatsApp"
+                            >
+                              <MessageSquare className="w-2.5 h-2.5 text-emerald-200" />
+                              <span>Send on WhatsApp</span>
+                            </a>
+                            <span className="text-[8px] text-slate-400 dark:text-slate-500 font-mono">
+                              {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
                           </div>
                         </div>
                       ))
@@ -5207,15 +5226,33 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                           </div>
                                         )}
 
-                                        {/* YouTube embed if URL is set and is not empty */}
+                                        {/* Video embed (YouTube / Google Drive) if URL is set */}
                                         {vid.url && (
-                                          <div className="aspect-video w-full rounded overflow-hidden bg-black border border-emerald-850">
-                                            <iframe
-                                              className="w-full h-full"
-                                              src={vid.url}
-                                              title={vid.title}
-                                              allowFullScreen
-                                            />
+                                          <div className="space-y-1.5">
+                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border border-emerald-850 shadow-sm">
+                                              <iframe
+                                                className="w-full h-full"
+                                                src={getEmbedVideoUrl(vid.url)}
+                                                title={vid.title}
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                allowFullScreen
+                                              />
+                                            </div>
+                                            {isGoogleDriveUrl(vid.url) && (
+                                              <div className="flex items-center justify-between text-[10px] text-emerald-700 dark:text-emerald-300 px-1 font-sans">
+                                                <span className="flex items-center gap-1 font-medium">
+                                                  📂 Google Drive Video Stream
+                                                </span>
+                                                <a
+                                                  href={vid.url}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="text-amber-600 dark:text-amber-300 font-bold hover:underline inline-flex items-center gap-1"
+                                                >
+                                                  <span>Open directly in Google Drive ↗</span>
+                                                </a>
+                                              </div>
+                                            )}
                                           </div>
                                         )}
                                       </div>
@@ -5770,6 +5807,19 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               </div>
                               <h3 className="font-serif font-bold text-sm text-emerald-900 dark:text-white leading-snug">{ann.title}</h3>
                               <p className="text-emerald-750 dark:text-emerald-300 font-sans leading-relaxed whitespace-pre-line">{ann.content}</p>
+                              <div className="pt-2 border-t border-emerald-100/60 dark:border-emerald-900/40 flex justify-end">
+                                <a
+                                  href={`https://wa.me/2348122455759?text=${encodeURIComponent(
+                                    `As-salamu alaykum.\n\n📢 *Abu Qoonitah Academy Announcement*\n*${ann.title}*\n\n${ann.content}\n\n— Published by ${ann.author}`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                                >
+                                  <MessageSquare className="w-3 h-3 text-emerald-200" />
+                                  <span>Send Announcement to WhatsApp</span>
+                                </a>
+                              </div>
                             </div>
                           ))}
                         {announcements.filter(ann => ann.targetRole === "all" || ann.targetRole === "student").length === 0 && (
@@ -8585,14 +8635,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                     
                                     {/* Video URL Option */}
                                     <div className="space-y-1">
-                                      <span className="font-semibold text-emerald-700 block uppercase font-mono text-[9px]">Option A: YouTube Embed URL (Optional)</span>
+                                      <span className="font-semibold text-emerald-700 block uppercase font-mono text-[9px]">Option A: Video Link (Google Drive Video or YouTube URL)</span>
                                       <input
                                         type="url"
-                                        placeholder="https://www.youtube.com/embed/..."
+                                        placeholder="https://drive.google.com/file/d/... or https://youtu.be/..."
                                         value={matUrl}
                                         onChange={(e) => setMatUrl(e.target.value)}
                                         className="p-2.5 border border-emerald-200 dark:border-emerald-800 rounded w-full bg-emerald-50/20 dark:bg-emerald-950 focus:outline-none text-emerald-950 dark:text-white font-mono text-xs"
                                       />
+                                      <span className="text-[9px] text-slate-400 block font-sans">
+                                        💡 Supports Google Drive video links & YouTube links. (Ensure Google Drive sharing is set to "Anyone with the link can view").
+                                      </span>
                                     </div>
 
                                     {/* Voice note recorder option */}
@@ -9524,10 +9577,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                               />
                             </div>
                             <div className="space-y-1">
-                              <span className="font-bold text-emerald-700 block">STREAM URL / PDF LINK</span>
+                              <span className="font-bold text-emerald-700 block">STREAM URL (GOOGLE DRIVE / YOUTUBE) / PDF LINK</span>
                               <input
                                 type="text"
-                                placeholder="https://www.youtube.com/embed/vT4r_2bI-0Q"
+                                placeholder="https://drive.google.com/file/d/... or https://youtu.be/..."
                                 value={matUrl}
                                 onChange={(e) => setMatUrl(e.target.value)}
                                 className="w-full bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white"
@@ -10625,11 +10678,11 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             />
                           </div>
                           <div className="space-y-1">
-                            <span className="font-bold text-emerald-700 block">YouTube Embed URL / Audio Stream URL</span>
+                            <span className="font-bold text-emerald-700 block">Google Drive Video / YouTube URL / Audio Stream URL</span>
                             <div className="flex gap-2">
                               <input
                                 type="text"
-                                placeholder="https://www.youtube.com/embed/8I869l_5mYg"
+                                placeholder="https://drive.google.com/file/d/... or https://youtu.be/..."
                                 value={newSermonUrl}
                                 onChange={(e) => setNewSermonUrl(e.target.value)}
                                 className="flex-1 bg-white dark:bg-emerald-950 border border-emerald-100 dark:border-emerald-800 rounded p-2 text-xs text-emerald-950 dark:text-white font-mono"

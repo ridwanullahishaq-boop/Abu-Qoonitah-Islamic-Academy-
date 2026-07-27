@@ -209,5 +209,7 @@ export interface AppNotification {
   read: boolean;
   fromName?: string;
   fromRole?: string;
+  recipientWhatsapp?: string;
+  whatsappUrl?: string;
 }
 

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Tv, Search, Play, Folder, User, Clock, ChevronRight } from "lucide-react";
+import { getEmbedVideoUrl, isGoogleDriveUrl } from "../utils/videoUtils";
 
 interface SermonTVProps {
   isArabic: boolean;
@@ -115,14 +116,31 @@ export default function SermonTV({ isArabic }: SermonTVProps) {
                   />
                 </div>
               ) : (
-                <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-black shadow-lg border border-emerald-50 dark:border-emerald-900/40">
-                  <iframe
-                    className="absolute inset-0 w-full h-full"
-                    src={activeSermon.url}
-                    title={activeSermon.title}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
+                <div className="space-y-2">
+                  <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-black shadow-lg border border-emerald-50 dark:border-emerald-900/40">
+                    <iframe
+                      className="absolute inset-0 w-full h-full"
+                      src={getEmbedVideoUrl(activeSermon.url)}
+                      title={activeSermon.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                  {isGoogleDriveUrl(activeSermon.url) && (
+                    <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-300 px-2 pt-1 font-sans">
+                      <span className="flex items-center gap-1 font-medium">
+                        📂 Google Drive Video Stream
+                      </span>
+                      <a
+                        href={activeSermon.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-amber-600 dark:text-amber-300 font-bold hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>Open directly in Google Drive ↗</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
               

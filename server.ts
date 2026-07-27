@@ -766,6 +766,17 @@ function authenticate(req: express.Request, res: express.Response, next: express
 }
 
 // --- NOTIFICATION UTILITIES & ENDPOINTS ---
+function formatWhatsappNumber(num?: string): string {
+  if (!num) return "2348122455759";
+  let clean = num.replace(/\D/g, "");
+  if (clean.startsWith("0")) {
+    clean = "234" + clean.slice(1);
+  } else if (!clean.startsWith("234") && clean.length === 10) {
+    clean = "234" + clean;
+  }
+  return clean || "2348122455759";
+}
+
 function createNotification(notif: {
   recipientId: string; // 'admin' | specific userId | 'teachers' | 'all'
   recipientRole?: 'admin' | 'teacher' | 'student' | 'all';
@@ -775,10 +786,26 @@ function createNotification(notif: {
   linkTab?: string;
   fromName?: string;
   fromRole?: string;
+  recipientWhatsapp?: string;
 }) {
   if (!db.notifications) {
     db.notifications = [];
   }
+
+  // Resolve target WhatsApp number
+  let targetPhone = "2348122455759"; // Default to Shaykh / Admin WhatsApp
+  if (notif.recipientWhatsapp) {
+    targetPhone = formatWhatsappNumber(notif.recipientWhatsapp);
+  } else if (notif.recipientId && notif.recipientId !== "admin" && notif.recipientId !== "teachers" && notif.recipientId !== "all") {
+    const targetUser = db.users[notif.recipientId];
+    if (targetUser && (targetUser.whatsapp || targetUser.phone)) {
+      targetPhone = formatWhatsappNumber(targetUser.whatsapp || targetUser.phone);
+    }
+  }
+
+  const waText = `As-salamu alaykum.\n\n📢 *Abu Qoonitah Academy Alert*\n*${notif.title}*\n\n${notif.message}\n\n— Sent from Abu Qoonitah Islamic Academy Portal`;
+  const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(waText)}`;
+
   const newNotif: AppNotification = {
     id: "notif-" + crypto.randomBytes(8).toString("hex"),
     recipientId: notif.recipientId,
@@ -790,7 +817,9 @@ function createNotification(notif: {
     createdAt: new Date().toISOString(),
     read: false,
     fromName: notif.fromName,
-    fromRole: notif.fromRole
+    fromRole: notif.fromRole,
+    recipientWhatsapp: targetPhone,
+    whatsappUrl
   };
   db.notifications.unshift(newNotif);
   if (db.notifications.length > 300) {
@@ -1942,6 +1971,18 @@ app.post("/api/submissions/:id/grade", authenticate, (req, res) => {
     }
   }
 
+  // Notify Student of Grade & Feedback via Portal + WhatsApp
+  createNotification({
+    recipientId: submission.studentId,
+    recipientRole: "student",
+    title: `🏆 ${submission.type.toUpperCase()} Graded by ${user.name}`,
+    message: `Your ${submission.type} "${submission.referenceTitle}" was graded: ${submission.score}/${submission.maxPoints}. Feedback: "${comments || 'Barakallahu Feekum!'}"`,
+    type: "assignment",
+    linkTab: "results",
+    fromName: user.name,
+    fromRole: user.role
+  });
+
   saveDatabase();
   res.json({ success: true, submission });
 });
@@ -2740,6 +2781,19 @@ app.post("/api/admin/announcements/create", authenticate, (req, res) => {
   };
 
   db.announcements.unshift(newAnn);
+
+  // Send system notification + generate WhatsApp alert for teachers and students
+  createNotification({
+    recipientId: "all",
+    recipientRole: (targetRole as any) || "all",
+    title: `📢 Announcement: ${title}`,
+    message: content,
+    type: "announcement",
+    linkTab: "announcements",
+    fromName: user.name,
+    fromRole: user.role
+  });
+
   saveDatabase();
   res.json({ success: true, announcement: newAnn });
 });
