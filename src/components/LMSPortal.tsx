@@ -3141,6 +3141,8 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     }
   }, [teacherSubTab, adminSubTab, currentUser]);
 
+  const [dispatchModalList, setDispatchModalList] = useState<any[]>([]);
+
   const handleCreateAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem("token") || "";
@@ -3159,10 +3161,20 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
     })
       .then((res) => res.json())
       .then((data) => {
-        setAnnouncements([data.announcement, ...announcements]);
+        if (data.announcement) {
+          setAnnouncements([data.announcement, ...announcements]);
+        }
         setAnnTitle("");
         setAnnContent("");
-        alert("Academic announcement broadcast successfully.");
+        if (data.whatsappDispatches && data.whatsappDispatches.length > 0) {
+          setDispatchModalList(data.whatsappDispatches);
+          // Automatically launch the first WhatsApp URL
+          if (data.whatsappDispatches[0]?.whatsappUrl) {
+            window.open(data.whatsappDispatches[0].whatsappUrl, "_blank");
+          }
+        } else {
+          alert("Academic announcement broadcasted successfully to all notifications.");
+        }
       })
       .catch((err) => console.error(err));
   };
@@ -8110,6 +8122,19 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 <div className="text-[10px] font-mono text-emerald-600 uppercase font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded-sm inline-block">Audience: {ann.targetRole}</div>
                                 <p className="text-emerald-800 dark:text-slate-300 font-sans leading-relaxed whitespace-pre-line mt-2">{ann.content}</p>
                               </div>
+                              <div className="pt-2 border-t border-emerald-100/60 dark:border-emerald-900/40 flex justify-end">
+                                <a
+                                  href={`https://wa.me/2348122455759?text=${encodeURIComponent(
+                                    `As-salamu alaykum.\n\n📢 *Abu Qoonitah Academy Announcement*\n*${ann.title}*\n\n${ann.content}\n\n— Published by ${ann.author}`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                                >
+                                  <MessageSquare className="w-3 h-3 text-emerald-200" />
+                                  <span>Send Announcement to WhatsApp</span>
+                                </a>
+                              </div>
                             </div>
                           ))}
                           {announcements.length === 0 && (
@@ -9167,19 +9192,34 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         </h3>
                         <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
                           {announcements.map((ann) => (
-                            <div key={ann.id} className="p-3 bg-emerald-50/30 dark:bg-emerald-950/40 rounded border border-emerald-150 dark:border-emerald-850 text-xs flex justify-between items-start gap-3">
-                              <div className="space-y-1 min-w-0 flex-grow">
-                                <h4 className="font-bold text-emerald-900 dark:text-white">{ann.title}</h4>
-                                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-normal">{ann.content}</p>
-                                <span className="text-[9px] text-emerald-400 block">To: {ann.targetRole} • {new Date(ann.date).toLocaleDateString()}</span>
+                            <div key={ann.id} className="p-3 bg-emerald-50/30 dark:bg-emerald-950/40 rounded-xl border border-emerald-150 dark:border-emerald-850 text-xs space-y-2">
+                              <div className="flex justify-between items-start gap-3">
+                                <div className="space-y-1 min-w-0 flex-grow">
+                                  <h4 className="font-bold text-emerald-900 dark:text-white">{ann.title}</h4>
+                                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-normal">{ann.content}</p>
+                                  <span className="text-[9px] text-emerald-400 block">To: {ann.targetRole} • {new Date(ann.date).toLocaleDateString()}</span>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteAnnouncement(ann.id)}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                                  title="Delete announcement"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
                               </div>
-                              <button
-                                onClick={() => handleDeleteAnnouncement(ann.id)}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded cursor-pointer"
-                                title="Delete announcement"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                              <div className="pt-1.5 border-t border-emerald-100/60 dark:border-emerald-900/40 flex justify-end">
+                                <a
+                                  href={`https://wa.me/2348122455759?text=${encodeURIComponent(
+                                    `As-salamu alaykum.\n\n📢 *Abu Qoonitah Academy Announcement*\n*${ann.title}*\n\n${ann.content}\n\n— Published by ${ann.author}`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                                >
+                                  <MessageSquare className="w-3 h-3 text-emerald-200" />
+                                  <span>Send to WhatsApp</span>
+                                </a>
+                              </div>
                             </div>
                           ))}
                           {announcements.length === 0 && (
@@ -12048,6 +12088,61 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
         </div>
       </div>
+
+      {/* WhatsApp Auto-Dispatch Roster Modal */}
+      {dispatchModalList.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs font-sans">
+          <div className="bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-scale-in text-xs">
+            <div className="flex justify-between items-center pb-3 border-b border-emerald-100 dark:border-emerald-900">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-sm font-bold text-emerald-950 dark:text-amber-100">
+                  WhatsApp Dispatch Center ({dispatchModalList.length} Recipients)
+                </h3>
+              </div>
+              <button
+                onClick={() => setDispatchModalList([])}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-slate-600 dark:text-emerald-200 text-xs leading-relaxed">
+              System notifications have been generated for all target users. Click below to send personalized WhatsApp messages to individual numbers:
+            </p>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {dispatchModalList.map((d, idx) => (
+                <div key={idx} className="p-3 bg-emerald-50/50 dark:bg-emerald-900/40 rounded-xl border border-emerald-100 dark:border-emerald-800 flex justify-between items-center gap-2">
+                  <div>
+                    <p className="font-bold text-emerald-950 dark:text-white">{d.userName} <span className="text-[10px] font-mono text-emerald-600 uppercase">({d.userRole})</span></p>
+                    <p className="text-[11px] font-mono text-slate-500">{d.phone}</p>
+                  </div>
+                  <a
+                    href={d.whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Send WhatsApp</span>
+                  </a>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-emerald-100 dark:border-emerald-900 flex justify-end">
+              <button
+                onClick={() => setDispatchModalList([])}
+                className="px-4 py-2 bg-slate-200 dark:bg-emerald-800 hover:bg-slate-300 dark:hover:bg-emerald-700 text-emerald-950 dark:text-white font-bold rounded-lg cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

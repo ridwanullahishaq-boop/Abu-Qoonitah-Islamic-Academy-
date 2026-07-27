@@ -2782,7 +2782,49 @@ app.post("/api/admin/announcements/create", authenticate, (req, res) => {
 
   db.announcements.unshift(newAnn);
 
-  // Send system notification + generate WhatsApp alert for teachers and students
+  // Send system notifications & generate WhatsApp links for each individual target user
+  const allUsersList = Object.values(db.users || {});
+  const matchingUsers = allUsersList.filter(u => {
+    if (!targetRole || targetRole === "all") return true;
+    return u.role === targetRole;
+  });
+
+  const whatsappDispatches: Array<{
+    userId: string;
+    userName: string;
+    userRole: string;
+    phone: string;
+    whatsappUrl: string;
+  }> = [];
+
+  matchingUsers.forEach(rUser => {
+    const phone = formatWhatsappNumber(rUser.whatsapp || rUser.phone);
+    const waText = `As-salamu alaykum ${rUser.name}.\n\n📢 *Abu Qoonitah Academy Announcement*\n*${title}*\n\n${content}\n\n— Published by ${user.name}`;
+    const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(waText)}`;
+
+    // Create personalized user notification
+    createNotification({
+      recipientId: rUser.id,
+      recipientRole: (rUser.role as any) || "all",
+      title: `📢 Announcement: ${title}`,
+      message: content,
+      type: "announcement",
+      linkTab: "announcements",
+      fromName: user.name,
+      fromRole: user.role,
+      recipientWhatsapp: phone
+    });
+
+    whatsappDispatches.push({
+      userId: rUser.id,
+      userName: rUser.name,
+      userRole: rUser.role,
+      phone,
+      whatsappUrl
+    });
+  });
+
+  // Also create a broad fallback notification for role filters
   createNotification({
     recipientId: "all",
     recipientRole: (targetRole as any) || "all",
@@ -2795,7 +2837,7 @@ app.post("/api/admin/announcements/create", authenticate, (req, res) => {
   });
 
   saveDatabase();
-  res.json({ success: true, announcement: newAnn });
+  res.json({ success: true, announcement: newAnn, whatsappDispatches });
 });
 
 // Admin/Teacher: Delete Announcement
