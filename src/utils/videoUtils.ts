@@ -1,3 +1,9 @@
+export function isDirectVideoUrl(url?: string): boolean {
+  if (!url) return false;
+  const trimmed = url.trim().toLowerCase();
+  return trimmed.startsWith("data:video") || trimmed.endsWith(".mp4") || trimmed.endsWith(".webm") || trimmed.endsWith(".ogg") || trimmed.includes("blob:");
+}
+
 /**
  * Formats video URLs (YouTube, Google Drive, Vimeo, direct MP4)
  * into proper embeddable iframe or stream URLs.

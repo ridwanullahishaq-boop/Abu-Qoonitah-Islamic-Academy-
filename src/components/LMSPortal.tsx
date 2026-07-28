@@ -10,7 +10,7 @@ import {
   ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive, CreditCard
 } from "lucide-react";
 import { AutoSaveBadge, useAutoSave, AutoSaveNotesVault } from "./AutoSaveManager";
-import { getEmbedVideoUrl, isGoogleDriveUrl, getPdfDownloadUrl, getPdfViewUrl, getPdfEmbedPreviewUrl } from "../utils/videoUtils";
+import { getEmbedVideoUrl, isGoogleDriveUrl, getPdfDownloadUrl, getPdfViewUrl, getPdfEmbedPreviewUrl, isDirectVideoUrl } from "../utils/videoUtils";
 
 interface LMSPortalProps {
   isArabic: boolean;
@@ -84,11 +84,19 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [calendarEvents, setCalendarEvents] = useState<SchoolCalendarEvent[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [openPdfViewers, setOpenPdfViewers] = useState<Record<string, boolean>>({});
+  const [openVideoViewers, setOpenVideoViewers] = useState<Record<string, boolean>>({});
 
   const togglePdfViewer = (pdfId: string) => {
     setOpenPdfViewers((prev) => ({
       ...prev,
       [pdfId]: !prev[pdfId],
+    }));
+  };
+
+  const toggleVideoViewer = (vidId: string) => {
+    setOpenVideoViewers((prev) => ({
+      ...prev,
+      [vidId]: !prev[vidId],
     }));
   };
   
@@ -5209,24 +5217,72 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   <span>Lesson Videos ({selectedCourse.videos.length})</span>
                                 </h4>
                                 <div className="space-y-2">
-                                  {selectedCourse.videos.map((vid) => (
-                                    <details key={vid.id} className="bg-emerald-50/50 dark:bg-emerald-950/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/40 text-xs">
-                                      <summary className="font-bold cursor-pointer text-emerald-900 dark:text-white flex justify-between items-center select-none">
-                                        <span className="flex items-center gap-1.5 flex-wrap">
-                                          <span>◈ {vid.title}</span>
+                                  {selectedCourse.videos.map((vid, vIdx) => (
+                                    <details key={vid.id} open={vIdx === 0} className="bg-white dark:bg-emerald-950 p-4 rounded-xl border border-emerald-100 dark:border-emerald-850 text-xs shadow-2xs space-y-3">
+                                      <summary className="font-bold cursor-pointer text-emerald-950 dark:text-white flex justify-between items-center select-none text-sm pb-1 border-b border-emerald-50 dark:border-emerald-900">
+                                        <span className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-amber-600 font-serif font-bold">▶ Lesson {vIdx + 1}: {vid.title}</span>
                                           {(vid.audioUrl || (vid.photos && vid.photos.length > 0)) && (
-                                            <span className="text-[8px] bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider font-mono">Audio & Slides</span>
+                                            <span className="text-[9px] bg-amber-500/20 text-amber-800 dark:text-amber-300 font-bold px-2 py-0.5 rounded-full uppercase font-mono">
+                                              Audio & Slides
+                                            </span>
                                           )}
                                         </span>
-                                        <span className="font-mono text-[9px] bg-emerald-800 text-white px-2 py-0.5 rounded">{vid.duration || "Audio Lecture"}</span>
+                                        <span className="font-mono text-[10px] bg-emerald-800 text-white px-2.5 py-1 rounded-full font-bold shadow-2xs">
+                                          ⏱️ {vid.duration || "Audio Lecture"}
+                                        </span>
                                       </summary>
-                                      <div className="mt-3 space-y-3">
-                                        <p className="text-[11px] text-emerald-650 dark:text-emerald-300 font-sans leading-relaxed">{vid.description}</p>
+
+                                      <div className="pt-2 space-y-3">
+                                        <p className="text-xs text-slate-700 dark:text-emerald-200 font-sans leading-relaxed">{vid.description}</p>
                                         
+                                        {/* Embedded Video Player on the Website */}
+                                        {vid.url ? (
+                                          <div className="space-y-2">
+                                            <div className="aspect-video w-full rounded-2xl overflow-hidden bg-slate-950 border border-emerald-900 shadow-md relative">
+                                              {isDirectVideoUrl(vid.url) ? (
+                                                <video
+                                                  src={vid.url}
+                                                  controls
+                                                  className="w-full h-full object-contain"
+                                                />
+                                              ) : (
+                                                <iframe
+                                                  className="w-full h-full border-0"
+                                                  src={getEmbedVideoUrl(vid.url)}
+                                                  title={vid.title}
+                                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                  allowFullScreen
+                                                />
+                                              )}
+                                            </div>
+
+                                            {isGoogleDriveUrl(vid.url) && (
+                                              <div className="flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300 px-1 font-sans bg-emerald-50 dark:bg-emerald-900/40 p-2 rounded-lg">
+                                                <span className="flex items-center gap-1 font-bold">
+                                                  📂 Google Drive Video Stream Player
+                                                </span>
+                                                <a
+                                                  href={vid.url}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="text-amber-700 dark:text-amber-300 font-bold hover:underline inline-flex items-center gap-1"
+                                                >
+                                                  <span>Open in Google Drive ↗</span>
+                                                </a>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl text-[11px] text-amber-800 dark:text-amber-200">
+                                            ℹ️ No video URL provided for this lesson yet.
+                                          </div>
+                                        )}
+
                                         {/* Audio voice note if present */}
                                         {vid.audioUrl && (
-                                          <div className="space-y-1 bg-white dark:bg-emerald-950 p-2.5 rounded-lg border border-emerald-100/50 dark:border-emerald-900/40">
-                                            <span className="font-bold text-[9px] text-amber-600 block uppercase font-mono">🎙️ Teacher's Voice Note Explanatory Lecture:</span>
+                                          <div className="space-y-1 bg-emerald-50/60 dark:bg-emerald-900/30 p-3 rounded-xl border border-emerald-100/60 dark:border-emerald-800">
+                                            <span className="font-bold text-[10px] text-amber-700 dark:text-amber-300 block uppercase font-mono">🎙️ Teacher's Voice Explanatory Note:</span>
                                             <audio src={vid.audioUrl} controls className="w-full h-8 mt-1" />
                                           </div>
                                         )}
@@ -5234,45 +5290,15 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                         {/* Board photos if present */}
                                         {vid.photos && vid.photos.length > 0 && (
                                           <div className="space-y-2">
-                                            <span className="font-bold text-[9px] text-emerald-800 dark:text-emerald-300 block uppercase font-mono">📸 Lesson Board Slides / Materials ({vid.photos.length}):</span>
+                                            <span className="font-bold text-[10px] text-emerald-900 dark:text-emerald-200 block uppercase font-mono">📸 Lesson Board Slides / Handouts ({vid.photos.length}):</span>
                                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                               {vid.photos.map((photo, pIdx) => (
-                                                <a key={pIdx} href={photo} target="_blank" rel="noopener noreferrer" className="relative group block rounded border border-emerald-100 dark:border-emerald-850 overflow-hidden bg-slate-50 aspect-square">
+                                                <a key={pIdx} href={photo} target="_blank" rel="noopener noreferrer" className="relative group block rounded-lg border border-emerald-200 dark:border-emerald-800 overflow-hidden bg-slate-50 aspect-square">
                                                   <img src={photo} alt={`Slide ${pIdx + 1}`} className="w-full h-full object-cover" />
-                                                  <span className="absolute inset-0 bg-black/55 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[9px] font-bold">Zoom slide</span>
+                                                  <span className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-[10px] font-bold">Zoom slide</span>
                                                 </a>
                                               ))}
                                             </div>
-                                          </div>
-                                        )}
-
-                                        {/* Video embed (YouTube / Google Drive) if URL is set */}
-                                        {vid.url && (
-                                          <div className="space-y-1.5">
-                                            <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border border-emerald-850 shadow-sm">
-                                              <iframe
-                                                className="w-full h-full"
-                                                src={getEmbedVideoUrl(vid.url)}
-                                                title={vid.title}
-                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                allowFullScreen
-                                              />
-                                            </div>
-                                            {isGoogleDriveUrl(vid.url) && (
-                                              <div className="flex items-center justify-between text-[10px] text-emerald-700 dark:text-emerald-300 px-1 font-sans">
-                                                <span className="flex items-center gap-1 font-medium">
-                                                  📂 Google Drive Video Stream
-                                                </span>
-                                                <a
-                                                  href={vid.url}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="text-amber-600 dark:text-amber-300 font-bold hover:underline inline-flex items-center gap-1"
-                                                >
-                                                  <span>Open directly in Google Drive ↗</span>
-                                                </a>
-                                              </div>
-                                            )}
                                           </div>
                                         )}
                                       </div>
@@ -8309,53 +8335,101 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   <span>Lesson Videos ({activeCourse.videos.length})</span>
                                 </h4>
                                 <div className="space-y-2">
-                                  {activeCourse.videos.map((vid) => (
-                                    <div key={vid.id} className="p-3 bg-emerald-50/20 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fade-in">
-                                      <div className="space-y-1 flex-1">
-                                        <div className="font-semibold text-emerald-950 dark:text-white flex items-center gap-1.5 flex-wrap">
-                                          <span>◈ {vid.title}</span>
-                                          {(vid.audioUrl || (vid.photos && vid.photos.length > 0)) && (
-                                            <span className="text-[8px] bg-amber-500/20 text-amber-750 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider font-mono">Audio & Slides</span>
-                                          )}
-                                        </div>
-                                        <div className="text-[10px] text-slate-400">{vid.description}</div>
-                                        <div className="text-[9px] font-mono text-amber-600 font-bold">Duration: {vid.duration || "Audio Lecture"}</div>
-                                        
-                                        {/* Audio preview for teacher */}
-                                        {vid.audioUrl && (
-                                          <div className="mt-1.5 p-1.5 bg-white dark:bg-emerald-950/40 rounded border border-emerald-100/40 max-w-md">
-                                            <span className="text-[8px] font-semibold text-emerald-700 uppercase block mb-0.5">🎙️ Lecture Audio:</span>
-                                            <audio src={vid.audioUrl} controls className="w-full h-6" />
-                                          </div>
-                                        )}
+                                  {activeCourse.videos.map((vid) => {
+                                    const isVideoOpen = openVideoViewers[vid.id];
+                                    return (
+                                      <div key={vid.id} className="p-3 bg-emerald-50/20 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-xl flex flex-col gap-2.5 text-xs animate-fade-in">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                          <div className="space-y-1 flex-1">
+                                            <div className="font-semibold text-emerald-950 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                              <span>◈ {vid.title}</span>
+                                              {(vid.audioUrl || (vid.photos && vid.photos.length > 0)) && (
+                                                <span className="text-[8px] bg-amber-500/20 text-amber-750 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider font-mono">Audio & Slides</span>
+                                              )}
+                                            </div>
+                                            <div className="text-[10px] text-slate-400">{vid.description}</div>
+                                            <div className="text-[9px] font-mono text-amber-600 font-bold">Duration: {vid.duration || "Audio Lecture"}</div>
+                                            
+                                            {/* Audio preview for teacher */}
+                                            {vid.audioUrl && (
+                                              <div className="mt-1.5 p-1.5 bg-white dark:bg-emerald-950/40 rounded border border-emerald-100/40 max-w-md">
+                                                <span className="text-[8px] font-semibold text-emerald-700 uppercase block mb-0.5">🎙️ Lecture Audio:</span>
+                                                <audio src={vid.audioUrl} controls className="w-full h-6" />
+                                              </div>
+                                            )}
 
-                                        {/* Slides preview for teacher */}
-                                        {vid.photos && vid.photos.length > 0 && (
-                                          <div className="mt-1.5 flex gap-1 overflow-x-auto py-1">
-                                            {vid.photos.map((ph, phIdx) => (
-                                              <img key={phIdx} src={ph} alt="board slide" className="w-10 h-10 object-cover rounded border border-emerald-100/40" />
-                                            ))}
+                                            {/* Slides preview for teacher */}
+                                            {vid.photos && vid.photos.length > 0 && (
+                                              <div className="mt-1.5 flex gap-1 overflow-x-auto py-1">
+                                                {vid.photos.map((ph, phIdx) => (
+                                                  <img key={phIdx} src={ph} alt="board slide" className="w-10 h-10 object-cover rounded border border-emerald-100/40" />
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-1.5 shrink-0 flex-wrap self-end sm:self-center">
+                                            {vid.url && (
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleVideoViewer(vid.id)}
+                                                className={`px-2.5 py-1 rounded text-[10px] font-bold border flex items-center gap-1 cursor-pointer transition-all ${
+                                                  isVideoOpen
+                                                    ? "bg-amber-600 text-white border-amber-700 shadow-2xs"
+                                                    : "bg-emerald-100/60 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-200/50"
+                                                }`}
+                                              >
+                                                <span>{isVideoOpen ? "✕ Close Player" : "▶ Play Video"}</span>
+                                              </button>
+                                            )}
+                                            <button
+                                              onClick={() => handleStartEditMaterial(activeCourse.id, "video", vid)}
+                                              className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-700 dark:text-emerald-300 rounded cursor-pointer transition-all border border-transparent"
+                                              title="Edit Lesson"
+                                            >
+                                              <Edit className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => { if(confirm(`Confirm deletion of lecture video "${vid.title}"?`)) handleDeleteCourseMaterial(activeCourse.id, "video", vid.id); }}
+                                              className="p-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 rounded cursor-pointer transition-all border border-transparent"
+                                              title="Delete Lesson"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Embedded Video Player Preview for Teacher/Admin */}
+                                        {isVideoOpen && vid.url && (
+                                          <div className="mt-1 p-2 bg-slate-950 rounded-xl border border-emerald-800 space-y-2">
+                                            <div className="flex justify-between items-center text-[10px] text-amber-200 font-bold px-1">
+                                              <span>▶ Video Player Preview ({vid.title})</span>
+                                              <button
+                                                type="button"
+                                                onClick={() => toggleVideoViewer(vid.id)}
+                                                className="text-slate-400 hover:text-white"
+                                              >
+                                                ✕ Close
+                                              </button>
+                                            </div>
+                                            <div className="aspect-video w-full rounded-lg overflow-hidden bg-black">
+                                              {isDirectVideoUrl(vid.url) ? (
+                                                <video src={vid.url} controls className="w-full h-full object-contain" />
+                                              ) : (
+                                                <iframe
+                                                  className="w-full h-full border-0"
+                                                  src={getEmbedVideoUrl(vid.url)}
+                                                  title={vid.title}
+                                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                  allowFullScreen
+                                                />
+                                              )}
+                                            </div>
                                           </div>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-1.5 self-end sm:self-center">
-                                        <button
-                                          onClick={() => handleStartEditMaterial(activeCourse.id, "video", vid)}
-                                          className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-700 dark:text-emerald-300 rounded cursor-pointer transition-all border border-transparent"
-                                          title="Edit Lesson"
-                                        >
-                                          <Edit className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={() => { if(confirm(`Confirm deletion of lecture video "${vid.title}"?`)) handleDeleteCourseMaterial(activeCourse.id, "video", vid.id); }}
-                                          className="p-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 rounded cursor-pointer transition-all border border-transparent"
-                                          title="Delete Lesson"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                   {activeCourse.videos.length === 0 && (
                                     <p className="text-[11px] text-slate-400 italic">No video classes published.</p>
                                   )}
