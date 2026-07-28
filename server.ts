@@ -183,8 +183,8 @@ const initialDB: DatabaseSchema = {
         { id: "vid-beg1-3", title: "Lesson 3: Vowels (Fathah, Kasrah, Dammah) and Tanween", url: "https://www.youtube.com/embed/jZ_E3O9nK8A", description: "Master the short vowel markings and double vowels (nunation).", duration: "20:10" }
       ],
       pdfs: [
-        { id: "pdf-beg1-1", title: "Arabic Writing & Alphabet Workbook", url: "https://example.com/arabic_writing_workbook.pdf", description: "Printable tracing exercises for mastering stroke order.", fileSize: "4.2 MB" },
-        { id: "pdf-beg1-2", title: "Makharij Visual Articulation Chart", url: "https://example.com/makharij_chart.pdf", description: "An anatomical chart illustrating correct throat and mouth positions.", fileSize: "1.8 MB" }
+        { id: "pdf-beg1-1", title: "Arabic Writing & Alphabet Workbook", url: "https://drive.google.com/file/d/1BpVRip-sFh2x-6d33-316Z57yJv9Jj/view?usp=sharing", description: "Printable tracing exercises for mastering stroke order.", fileSize: "4.2 MB" },
+        { id: "pdf-beg1-2", title: "Makharij Visual Articulation Chart", url: "https://drive.google.com/file/d/1_ExampleMakharijChartDriveId/view?usp=sharing", description: "An anatomical chart illustrating correct throat and mouth positions.", fileSize: "1.8 MB" }
       ],
       assignments: [
         { id: "assign-beg1-1", title: "Alphabet Writing Assignment", description: "Write down the Arabic letters in their individual, starting, middle, and ending forms on a blank sheet. Take a photo of your work and submit it.", dueDate: "2026-07-20", points: 20 }
@@ -219,7 +219,7 @@ const initialDB: DatabaseSchema = {
         { id: "vid-beg2-2", title: "Lesson 2: Idgham (With and Without Ghunnah)", url: "https://www.youtube.com/embed/8I869l_5mYg", description: "How to merge letters when reciting, with nasalization examples.", duration: "25:30" }
       ],
       pdfs: [
-        { id: "pdf-beg2-1", title: "Tajweed Golden Summary Guide", url: "https://example.com/tajweed_summary.pdf", description: "One-page cheat sheet showing all Noon Sakinah letters.", fileSize: "1.2 MB" }
+        { id: "pdf-beg2-1", title: "Tajweed Golden Summary Guide", url: "https://drive.google.com/file/d/1_TajweedSummaryGuideDriveId/view?usp=sharing", description: "One-page cheat sheet showing all Noon Sakinah letters.", fileSize: "1.2 MB" }
       ],
       assignments: [
         { id: "assign-beg2-1", title: "Record Surah Al-Ikhlas recitation", description: "Record an audio file of yourself reciting Surah Al-Ikhlas while applying Izhar Halqi or other rules. Upload or write your self-evaluation.", dueDate: "2026-07-25", points: 30 }
@@ -252,7 +252,7 @@ const initialDB: DatabaseSchema = {
         { id: "vid-int1-1", title: "Lesson 1: The Three Word Classifications", url: "https://www.youtube.com/embed/jZ_E3O9nK8A", description: "Deep dive into signs of an Ism, Fi'l, and Harf.", duration: "28:10" }
       ],
       pdfs: [
-        { id: "pdf-int1-1", title: "Fundamentals of Nahw Workbook", url: "https://example.com/fundamentals_of_nahw.pdf", description: "Comprehensive grammar exercises with solutions.", fileSize: "5.5 MB" }
+        { id: "pdf-int1-1", title: "Fundamentals of Nahw Workbook", url: "https://drive.google.com/file/d/1_FundamentalsOfNahwDriveId/view?usp=sharing", description: "Comprehensive grammar exercises with solutions.", fileSize: "5.5 MB" }
       ],
       assignments: [
         { id: "assign-int1-1", title: "Grammatical Breakdown of Surah Fatiha Verse 1-3", description: "Identify the nouns, verbs, and particles in the first three verses of Surah Al-Fatiha and submit your analysis.", dueDate: "2026-07-28", points: 50 }
@@ -285,7 +285,7 @@ const initialDB: DatabaseSchema = {
         { id: "vid-adv1-1", title: "Lesson 1: Introduction to Matn & Author's Biography", url: "https://www.youtube.com/embed/vT4r_2bI-0Q", description: "Contextual history of Ibn Ajurrum and the structure of his famous text.", duration: "32:40" }
       ],
       pdfs: [
-        { id: "pdf-adv1-1", title: "Matn Al-Ajurrumiyyah Arabic-English Interlinear", url: "https://example.com/ajurrumiyyah_interlinear.pdf", description: "The original text paired with word-by-word explanation.", fileSize: "3.6 MB" }
+        { id: "pdf-adv1-1", title: "Matn Al-Ajurrumiyyah Arabic-English Interlinear", url: "https://drive.google.com/file/d/1_AjurrumiyyahInterlinearDriveId/view?usp=sharing", description: "The original text paired with word-by-word explanation.", fileSize: "3.6 MB" }
       ],
       assignments: [
         { id: "assign-adv1-1", title: "Advanced Syntactical Research Paper", description: "Analyze the complete grammatical structures and rhetorical implications of Ayat Al-Kursi (2:255). Word count: 1000+ words in Arabic/English.", dueDate: "2026-08-15", points: 100 }
@@ -318,7 +318,7 @@ const initialDB: DatabaseSchema = {
         { id: "vid-free1-1", title: "Complete Step-by-Step Salah Guide", url: "https://www.youtube.com/embed/jZ_E3O9nK8A", description: "A highly visual demonstration of the entire prayer from start to finish.", duration: "18:30" }
       ],
       pdfs: [
-        { id: "pdf-free1-1", title: "Prophetic Prayer Pocket Guide", url: "https://example.com/prophetic_prayer_guide.pdf", description: "A beautifully illustrated pocket booklet to memorize prayers.", fileSize: "2.5 MB" }
+        { id: "pdf-free1-1", title: "Prophetic Prayer Pocket Guide", url: "https://drive.google.com/file/d/1_PropheticPrayerPocketGuideDriveId/view?usp=sharing", description: "A beautifully illustrated pocket booklet to memorize prayers.", fileSize: "2.5 MB" }
       ],
       assignments: [],
       quizzes: []

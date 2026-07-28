@@ -10,7 +10,7 @@ import {
   ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive, CreditCard
 } from "lucide-react";
 import { AutoSaveBadge, useAutoSave, AutoSaveNotesVault } from "./AutoSaveManager";
-import { getEmbedVideoUrl, isGoogleDriveUrl } from "../utils/videoUtils";
+import { getEmbedVideoUrl, isGoogleDriveUrl, getPdfDownloadUrl, getPdfViewUrl, getPdfEmbedPreviewUrl } from "../utils/videoUtils";
 
 interface LMSPortalProps {
   isArabic: boolean;
@@ -83,6 +83,14 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<SchoolCalendarEvent[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [openPdfViewers, setOpenPdfViewers] = useState<Record<string, boolean>>({});
+
+  const togglePdfViewer = (pdfId: string) => {
+    setOpenPdfViewers((prev) => ({
+      ...prev,
+      [pdfId]: !prev[pdfId],
+    }));
+  };
   
   // --- Notifications State & Fetcher ---
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -5283,20 +5291,126 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   <span>Course Study Handouts / Notes ({selectedCourse.pdfs.length})</span>
                                 </h4>
                                 <div className="space-y-2">
-                                  {selectedCourse.pdfs.map((pdf) => (
-                                    <div key={pdf.id} className="p-3 bg-white dark:bg-emerald-950 rounded border border-emerald-100 dark:border-emerald-850 flex justify-between items-center text-xs">
-                                      <div>
-                                        <span className="font-bold text-emerald-900 dark:text-white">{pdf.title}</span>
-                                        <p className="text-[10px] text-emerald-500">{pdf.description}</p>
+                                  {selectedCourse.pdfs.map((pdf) => {
+                                    const isGdrive = isGoogleDriveUrl(pdf.url);
+                                    const downloadHref = getPdfDownloadUrl(pdf.url);
+                                    const viewHref = getPdfViewUrl(pdf.url);
+                                    const embedPreviewUrl = getPdfEmbedPreviewUrl(pdf.url);
+                                    const isOpen = openPdfViewers[pdf.id];
+
+                                    return (
+                                      <div key={pdf.id} className="p-3.5 bg-white dark:bg-emerald-950 rounded-xl border border-emerald-100 dark:border-emerald-850 flex flex-col gap-3 text-xs shadow-2xs transition-all">
+                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                          <div className="space-y-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <FileText className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
+                                              <span className="font-bold text-sm text-emerald-900 dark:text-white">{pdf.title}</span>
+                                              {isGdrive && (
+                                                <span className="text-[10px] bg-emerald-100/80 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded-md font-mono font-bold border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                                                  📂 Google Drive Document
+                                                </span>
+                                              )}
+                                            </div>
+                                            {pdf.description && (
+                                              <p className="text-[11px] text-slate-600 dark:text-emerald-300 leading-relaxed">{pdf.description}</p>
+                                            )}
+                                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold block">Size: {pdf.fileSize || "PDF Document"}</span>
+                                          </div>
+
+                                          <div className="flex items-center gap-2 shrink-0 flex-wrap self-end sm:self-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => togglePdfViewer(pdf.id)}
+                                              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                                                isOpen
+                                                  ? "bg-emerald-800 text-white border-emerald-900 shadow-xs"
+                                                  : "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-800/60"
+                                              }`}
+                                            >
+                                              <span>{isOpen ? "✕ Close Reader" : "📖 Read on Website"}</span>
+                                            </button>
+
+                                            {isGdrive && (
+                                              <a
+                                                href={viewHref}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-lg text-[11px] font-bold hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                                title="Open full document in Google Drive in a new tab"
+                                              >
+                                                <span>Google Drive ↗</span>
+                                              </a>
+                                            )}
+
+                                            <a
+                                              href={downloadHref}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              download
+                                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                              title="Download PDF file directly"
+                                              onClick={(e) => {
+                                                if (!pdf.url || pdf.url === "#") {
+                                                  e.preventDefault();
+                                                  alert("No downloadable link provided for this handout.");
+                                                }
+                                              }}
+                                            >
+                                              <span>📥 {pdf.fileSize ? `${pdf.fileSize} Download` : "Download PDF"}</span>
+                                            </a>
+                                          </div>
+                                        </div>
+
+                                        {/* Embedded Google Drive Document Reader */}
+                                        {isOpen && (
+                                          <div className="mt-1 p-3 bg-slate-100 dark:bg-emerald-900/30 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-2 animate-fade-in">
+                                            <div className="flex justify-between items-center text-xs pb-2 border-b border-emerald-200/60 dark:border-emerald-800">
+                                              <span className="font-bold text-emerald-950 dark:text-amber-200 flex items-center gap-1.5">
+                                                <FileText className="w-4 h-4 text-emerald-600" />
+                                                <span>Google Drive Document Viewer ({pdf.title})</span>
+                                              </span>
+                                              <div className="flex items-center gap-3">
+                                                {isGdrive && (
+                                                  <a
+                                                    href={viewHref}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-amber-700 dark:text-amber-300 font-bold hover:underline text-[11px] flex items-center gap-1"
+                                                  >
+                                                    <span>Open in Google Drive ↗</span>
+                                                  </a>
+                                                )}
+                                                <a
+                                                  href={downloadHref}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  download
+                                                  className="text-emerald-700 dark:text-emerald-300 font-bold hover:underline text-[11px] flex items-center gap-1"
+                                                >
+                                                  <span>Download File 📥</span>
+                                                </a>
+                                              </div>
+                                            </div>
+                                            {embedPreviewUrl ? (
+                                              <div className="relative w-full h-[540px] rounded-lg overflow-hidden bg-slate-900 shadow-inner">
+                                                <iframe
+                                                  src={embedPreviewUrl}
+                                                  className="w-full h-full border-0"
+                                                  title={pdf.title}
+                                                  allow="autoplay; encrypted-media; picture-in-picture"
+                                                  allowFullScreen
+                                                />
+                                              </div>
+                                            ) : (
+                                              <div className="p-4 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 text-xs rounded-lg">
+                                                ⚠️ Embedded preview unavailable. Please click the Google Drive or Download button above to view this document.
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
-                                      <button
-                                        onClick={() => alert(`Downloading handout: ${pdf.title}...`)}
-                                        className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900 text-emerald-750 dark:text-amber-200 border border-emerald-100 rounded text-[10px] font-bold"
-                                      >
-                                        {pdf.fileSize} PDF Download
-                                      </button>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                   {selectedCourse.pdfs.length === 0 && (
                                     <p className="text-xs italic text-emerald-500">No notes published for this class yet.</p>
                                   )}
@@ -8255,31 +8369,113 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                   <span>Study Workbooks & Handouts ({activeCourse.pdfs.length})</span>
                                 </h4>
                                 <div className="space-y-2">
-                                  {activeCourse.pdfs.map((pdf) => (
-                                    <div key={pdf.id} className="p-3 bg-emerald-50/20 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-lg flex justify-between items-center text-xs animate-fade-in">
-                                      <div>
-                                        <div className="font-semibold text-emerald-950 dark:text-white">{pdf.title}</div>
-                                        <div className="text-[10px] text-slate-400 line-clamp-1">{pdf.description}</div>
-                                        <div className="text-[9px] font-mono text-amber-600 font-bold mt-0.5">Size: {pdf.fileSize}</div>
+                                  {activeCourse.pdfs.map((pdf) => {
+                                    const isGdrive = isGoogleDriveUrl(pdf.url);
+                                    const downloadHref = getPdfDownloadUrl(pdf.url);
+                                    const viewHref = getPdfViewUrl(pdf.url);
+                                    const embedPreviewUrl = getPdfEmbedPreviewUrl(pdf.url);
+                                    const isOpen = openPdfViewers[pdf.id];
+
+                                    return (
+                                      <div key={pdf.id} className="p-3 bg-emerald-50/20 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 rounded-xl flex flex-col gap-2.5 text-xs animate-fade-in">
+                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                          <div>
+                                            <div className="font-semibold text-emerald-950 dark:text-white flex items-center gap-1.5 flex-wrap">
+                                              <span>{pdf.title}</span>
+                                              {isGdrive && (
+                                                <span className="text-[9px] bg-emerald-100/70 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 px-1.5 py-0.2 rounded font-mono">
+                                                  Google Drive PDF
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 line-clamp-1">{pdf.description}</div>
+                                            <div className="text-[9px] font-mono text-amber-600 font-bold mt-0.5">Size: {pdf.fileSize}</div>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 shrink-0 flex-wrap self-end sm:self-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => togglePdfViewer(pdf.id)}
+                                              className={`px-2 py-1 rounded text-[10px] font-bold border flex items-center gap-1 cursor-pointer transition-all ${
+                                                isOpen
+                                                  ? "bg-emerald-800 text-white border-emerald-900"
+                                                  : "bg-emerald-100/60 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-200/50"
+                                              }`}
+                                            >
+                                              <span>{isOpen ? "✕ Close Reader" : "📖 Read on Site"}</span>
+                                            </button>
+                                            {pdf.url && (
+                                              <a
+                                                href={downloadHref}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                download
+                                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                                                title="Download PDF"
+                                              >
+                                                <span>📥 Download</span>
+                                              </a>
+                                            )}
+                                            {isGdrive && (
+                                              <a
+                                                href={viewHref}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-2 py-1 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded text-[10px] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                                                title="View in Google Drive"
+                                              >
+                                                <span>View ↗</span>
+                                              </a>
+                                            )}
+                                            <button
+                                              onClick={() => handleStartEditMaterial(activeCourse.id, "pdf", pdf)}
+                                              className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-700 dark:text-emerald-300 rounded cursor-pointer transition-all border border-transparent"
+                                              title="Edit Handout"
+                                            >
+                                              <Edit className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => { if(confirm(`Confirm deletion of workbook handout "${pdf.title}"?`)) handleDeleteCourseMaterial(activeCourse.id, "pdf", pdf.id); }}
+                                              className="p-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 rounded cursor-pointer transition-all border border-transparent"
+                                              title="Delete Handout"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        {/* Embedded Reader Frame for Admin/Teacher */}
+                                        {isOpen && (
+                                          <div className="mt-1 p-2.5 bg-slate-900/90 rounded-lg border border-emerald-800 space-y-2">
+                                            <div className="flex justify-between items-center text-[10px] text-amber-200 font-bold">
+                                              <span>Google Drive Document Viewer — {pdf.title}</span>
+                                              <button
+                                                type="button"
+                                                onClick={() => togglePdfViewer(pdf.id)}
+                                                className="text-slate-400 hover:text-white"
+                                              >
+                                                ✕ Close
+                                              </button>
+                                            </div>
+                                            {embedPreviewUrl ? (
+                                              <div className="w-full h-[450px] rounded overflow-hidden">
+                                                <iframe
+                                                  src={embedPreviewUrl}
+                                                  className="w-full h-full border-0"
+                                                  title={pdf.title}
+                                                  allow="autoplay; encrypted-media; picture-in-picture"
+                                                  allowFullScreen
+                                                />
+                                              </div>
+                                            ) : (
+                                              <div className="p-3 bg-amber-950/60 text-amber-200 text-[10px] rounded">
+                                                Preview link not available.
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
-                                      <div className="flex items-center gap-1.5">
-                                        <button
-                                          onClick={() => handleStartEditMaterial(activeCourse.id, "pdf", pdf)}
-                                          className="p-1.5 bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-700 dark:text-emerald-300 rounded cursor-pointer transition-all border border-transparent"
-                                          title="Edit Handout"
-                                        >
-                                          <Edit className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={() => { if(confirm(`Confirm deletion of workbook handout "${pdf.title}"?`)) handleDeleteCourseMaterial(activeCourse.id, "pdf", pdf.id); }}
-                                          className="p-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-600 rounded cursor-pointer transition-all border border-transparent"
-                                          title="Delete Handout"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                   {activeCourse.pdfs.length === 0 && (
                                     <p className="text-[11px] text-slate-400 italic">No workbook files published.</p>
                                   )}
@@ -8764,14 +8960,17 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                                 {matType === "pdf" && (
                                   <div className="space-y-1 animate-fade-in">
-                                    <span className="font-bold text-emerald-700 block uppercase font-mono text-[9px]">PDF Resource URL Link</span>
+                                    <span className="font-bold text-emerald-700 block uppercase font-mono text-[9px]">PDF Resource URL Link (Google Drive / Direct PDF)</span>
                                     <input
                                       type="text"
-                                      placeholder="https://example.com/handout.pdf"
+                                      placeholder="https://drive.google.com/file/d/... or https://example.com/handout.pdf"
                                       value={matUrl}
                                       onChange={(e) => setMatUrl(e.target.value)}
-                                      className="p-2.5 border border-emerald-200 dark:border-emerald-800 rounded w-full bg-emerald-50/20 dark:bg-emerald-950 focus:outline-none text-emerald-950 dark:text-white"
+                                      className="p-2.5 border border-emerald-200 dark:border-emerald-800 rounded w-full bg-emerald-50/20 dark:bg-emerald-950 focus:outline-none text-emerald-950 dark:text-white text-xs font-mono"
                                     />
+                                    <span className="text-[9px] text-slate-400 block font-sans">
+                                      💡 Paste a Google Drive file link or direct PDF URL. (Ensure Google Drive file sharing is set to "Anyone with the link can view").
+                                    </span>
                                   </div>
                                 )}
 

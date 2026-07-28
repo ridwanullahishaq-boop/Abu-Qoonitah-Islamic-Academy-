@@ -63,3 +63,75 @@ export function isGoogleDriveUrl(url?: string): boolean {
   if (!url) return false;
   return url.includes("drive.google.com");
 }
+
+export function getGoogleDriveFileId(url?: string): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const fileDMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileDMatch && fileDMatch[1]) {
+    return fileDMatch[1];
+  }
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) {
+    return idMatch[1];
+  }
+  const openMatch = trimmed.match(/\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (openMatch && openMatch[1]) {
+    return openMatch[1];
+  }
+  const ucMatch = trimmed.match(/\/uc\?.*id=([a-zA-Z0-9_-]+)/);
+  if (ucMatch && ucMatch[1]) {
+    return ucMatch[1];
+  }
+  return null;
+}
+
+/**
+ * Returns an embeddable preview URL for Google Drive or Web PDFs
+ */
+export function getPdfEmbedPreviewUrl(url?: string): string {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (trimmed.includes("drive.google.com")) {
+    const fileId = getGoogleDriveFileId(trimmed);
+    if (fileId) {
+      return `https://drive.google.com/file/d/${fileId}/preview`;
+    }
+  }
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    if (!trimmed.includes("example.com")) {
+      return `https://docs.google.com/gview?url=${encodeURIComponent(trimmed)}&embedded=true`;
+    }
+  }
+  return trimmed;
+}
+
+/**
+ * Returns a direct download or Google Drive download export link for PDFs/Handouts
+ */
+export function getPdfDownloadUrl(url?: string): string {
+  if (!url) return "#";
+  const trimmed = url.trim();
+  if (trimmed.includes("drive.google.com")) {
+    const fileId = getGoogleDriveFileId(trimmed);
+    if (fileId) {
+      return `https://drive.google.com/uc?export=download&id=${fileId}&confirm=no_antivirus`;
+    }
+  }
+  return trimmed;
+}
+
+/**
+ * Returns a Google Drive view/preview link or direct link for PDF viewing
+ */
+export function getPdfViewUrl(url?: string): string {
+  if (!url) return "#";
+  const trimmed = url.trim();
+  if (trimmed.includes("drive.google.com")) {
+    const fileId = getGoogleDriveFileId(trimmed);
+    if (fileId) {
+      return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+    }
+  }
+  return trimmed;
+}
