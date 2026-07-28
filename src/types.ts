@@ -22,6 +22,7 @@ export interface User {
   attendance: Record<string, { date: string; status: 'present' | 'absent' | 'excused' }[]>; // CourseID -> Attendance records
   createdAt: string;
   plainPassword?: string;
+  certificateAccess?: 'open' | 'closed';
   whyJoin?: string;
   dob?: string;
   country?: string;

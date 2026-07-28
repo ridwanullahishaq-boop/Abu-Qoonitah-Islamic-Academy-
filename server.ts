@@ -2281,6 +2281,56 @@ app.post("/api/admin/students/:id/payment", authenticate, (req, res) => {
   res.json({ success: true, student });
 });
 
+// Admin: Toggle certificate access for student (open/closed)
+app.post("/api/admin/students/:id/certificate-access", authenticate, (req, res) => {
+  const adminId = (req as any).userId;
+  const admin = db.users[adminId];
+  const studentId = req.params.id;
+  const { certificateAccess } = req.body; // "open" | "closed"
+
+  if (!admin || (admin.role !== "admin" && admin.role !== "teacher")) {
+    res.status(403).json({ error: "Access denied." });
+    return;
+  }
+
+  const student = db.users[studentId];
+  if (!student) {
+    res.status(404).json({ error: "Student not found." });
+    return;
+  }
+
+  student.certificateAccess = certificateAccess === "closed" ? "closed" : "open";
+  db.users[studentId] = student;
+  saveDatabase();
+
+  res.json({ success: true, student: { id: student.id, certificateAccess: student.certificateAccess } });
+});
+
+// Admin: Bulk toggle certificate access for all students
+app.post("/api/admin/students/bulk-certificate-access", authenticate, (req, res) => {
+  const adminId = (req as any).userId;
+  const admin = db.users[adminId];
+  const { certificateAccess, level } = req.body; // "open" | "closed"
+
+  if (!admin || (admin.role !== "admin" && admin.role !== "teacher")) {
+    res.status(403).json({ error: "Access denied." });
+    return;
+  }
+
+  let count = 0;
+  Object.values(db.users).forEach(u => {
+    if (u.role === "student") {
+      if (!level || level === "all" || u.level === level) {
+        u.certificateAccess = certificateAccess === "closed" ? "closed" : "open";
+        count++;
+      }
+    }
+  });
+
+  saveDatabase();
+  res.json({ success: true, count, certificateAccess });
+});
+
 // Admin: Create student account manually
 app.post("/api/admin/students/create", authenticate, async (req, res) => {
   const adminId = (req as any).userId;
