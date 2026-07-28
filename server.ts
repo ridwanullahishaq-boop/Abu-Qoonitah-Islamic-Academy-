@@ -1820,7 +1820,7 @@ app.post("/api/submissions/submit", authenticate, (req, res) => {
             }
           }
         });
-        const totalQuestions = answeredCount || quiz.questions.length || 1;
+        const totalQuestions = quiz.questions.length || answeredCount || 1;
         score = Math.round((correctCount / totalQuestions) * maxPoints);
         
         // If automatic marking is enabled (defaulting to true), set status as graded

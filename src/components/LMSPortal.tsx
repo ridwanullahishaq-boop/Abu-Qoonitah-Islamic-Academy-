@@ -210,7 +210,40 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   const [selectedResultStudent, setSelectedResultStudent] = useState<string>("");
   const [resultSearchQuery, setResultSearchQuery] = useState<string>("");
   const [resultLevelFilter, setResultLevelFilter] = useState<string>("all");
-  const [showNavGuide, setShowNavGuide] = useState<boolean>(true);
+  const [showNavGuide, setShowNavGuide] = useState<boolean>(false);
+
+  const handleSelectStudentSubTab = (tab: typeof studentSubTab) => {
+    setStudentSubTab(tab);
+    setSelectedCourse(null);
+    setTimeout(() => {
+      const el = document.getElementById("subtab-content");
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 40);
+  };
+
+  const handleSelectTeacherSubTab = (tab: typeof teacherSubTab) => {
+    setTeacherSubTab(tab);
+    setTimeout(() => {
+      const el = document.getElementById("subtab-content");
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 40);
+  };
+
+  const handleSelectAdminSubTab = (tab: string) => {
+    setAdminSubTab(tab);
+    setTimeout(() => {
+      const el = document.getElementById("subtab-content");
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 40);
+  };
+
+  const handleSelectMainTab = (tab: string) => {
+    setActiveTab(tab);
+    setTimeout(() => {
+      const el = document.getElementById("main-portal-content");
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 40);
+  };
 
   // --- Teacher Registration states ---
   const [tchName, setTchName] = useState("");
@@ -382,15 +415,29 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   };
 
   // 50-Mark Semester 1 Marking System Helper
-  const calculateSemesterMarks = (studentName: string) => {
-    const studentSubs = submissions.filter(s => s.studentName === studentName);
-    
+  const calculateSemesterMarks = (studentNameOrObj: string | any) => {
+    let targetName = "";
+    let targetId = "";
+    if (typeof studentNameOrObj === "string") {
+      targetName = studentNameOrObj.toLowerCase().trim();
+    } else if (studentNameOrObj && typeof studentNameOrObj === "object") {
+      targetName = (studentNameOrObj.name || "").toLowerCase().trim();
+      targetId = studentNameOrObj.id || "";
+    }
+
+    const studentSubs = submissions.filter(s => {
+      if (!s) return false;
+      if (targetId && s.studentId === targetId) return true;
+      const sName = (s.studentName || "").toLowerCase().trim();
+      return Boolean(targetName && sName && sName === targetName);
+    });
+
     // 1. Assignments: 1 mark per assignment, up to 20 marks total
     const assignmentsList = studentSubs.filter(s => s.type === "assignment");
     const assignmentMarks = Math.min(20, assignmentsList.length);
     
     // 2. CBT Test: 5 marks. Find quiz containing "cbt" or "test" or fallback to any quiz
-    const cbtSub = studentSubs.find(s => s.type === "quiz" && (s.referenceTitle.toLowerCase().includes("cbt") || s.referenceTitle.toLowerCase().includes("test")))
+    const cbtSub = studentSubs.find(s => s.type === "quiz" && (s.referenceTitle?.toLowerCase().includes("cbt") || s.referenceTitle?.toLowerCase().includes("test")))
       || studentSubs.find(s => s.type === "quiz");
     const cbtMark = cbtSub && cbtSub.score !== undefined && (subMaxPoints(cbtSub) > 0)
       ? Math.round((cbtSub.score / subMaxPoints(cbtSub)) * 5)
@@ -398,14 +445,14 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
     const cbtTitle = cbtSub ? cbtSub.referenceTitle : "Not Attempted";
     
     // 3. Oral Test: 5 marks. Look for any assignment/quiz containing "oral"
-    const oralSub = studentSubs.find(s => s.referenceTitle.toLowerCase().includes("oral"));
+    const oralSub = studentSubs.find(s => s.referenceTitle?.toLowerCase().includes("oral"));
     const oralMark = oralSub && oralSub.score !== undefined && (subMaxPoints(oralSub) > 0)
       ? Math.round((oralSub.score / subMaxPoints(oralSub)) * 5)
       : 0;
     const oralTitle = oralSub ? oralSub.referenceTitle : "Not Attempted";
     
     // 4. Final Exam: 20 marks. Look for any submission containing "final" or "exam"
-    const finalSub = studentSubs.find(s => s.referenceTitle.toLowerCase().includes("final") || s.referenceTitle.toLowerCase().includes("exam"));
+    const finalSub = studentSubs.find(s => s.referenceTitle?.toLowerCase().includes("final") || s.referenceTitle?.toLowerCase().includes("exam"));
     const finalMark = finalSub && finalSub.score !== undefined && (subMaxPoints(finalSub) > 0)
       ? Math.round((finalSub.score / subMaxPoints(finalSub)) * 20)
       : 0;
@@ -1401,17 +1448,29 @@ Please keep this secure.`;
     })
       .then((res) => res.json())
       .then((data) => {
-        setSubmissions([data.submission, ...submissions]);
+        if (data.submission) {
+          setSubmissions(prev => [data.submission, ...prev.filter(s => s.id !== data.submission.id)]);
+        }
         
         // Calculate scores for prompt visual
         let correct = 0;
-        activeQuiz.questions.forEach((q: any) => {
-          if (quizAnswers[q.id] === q.correctAnswerIndex) correct++;
-        });
-        setQuizScore({
-          score: Math.round((correct / activeQuiz.questions.length) * 100),
-          maxPoints: 100
-        });
+        if (activeQuiz && activeQuiz.questions) {
+          activeQuiz.questions.forEach((q: any) => {
+            if (quizAnswers[q.id] === q.correctAnswerIndex) correct++;
+          });
+          setQuizScore({
+            score: Math.round((correct / activeQuiz.questions.length) * 100),
+            maxPoints: 100
+          });
+        }
+
+        // Re-fetch fresh submissions
+        fetch("/api/submissions", { headers: { Authorization: `Bearer ${token}` } })
+          .then((res) => res.json())
+          .then((freshData) => {
+            if (Array.isArray(freshData)) setSubmissions(freshData);
+          })
+          .catch((err) => console.error(err));
       })
       .catch((err) => console.error(err));
   };
@@ -4958,10 +5017,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-800 pb-4">
+                    <div id="subtab-content" className="flex flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-800 pb-4 scroll-mt-20">
                       {/* 1. Academic Results (Highlighted) */}
                       <button
-                        onClick={() => { setStudentSubTab("results"); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("results")}
                         className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 border ${
                           studentSubTab === "results"
                             ? "bg-amber-500 text-emerald-950 border-amber-600 shadow-sm font-extrabold"
@@ -4977,7 +5036,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                       {/* 2. Enrolled Classes */}
                       <button
-                        onClick={() => { setStudentSubTab("courses"); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("courses")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                           studentSubTab === "courses"
                             ? "bg-emerald-700 text-white shadow-sm"
@@ -4989,7 +5048,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                       {/* 3. Assignments */}
                       <button
-                        onClick={() => { setStudentSubTab("assignments"); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("assignments")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                           studentSubTab === "assignments"
                             ? "bg-emerald-700 text-white shadow-sm"
@@ -5001,7 +5060,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                       {/* 4. My Teacher */}
                       <button
-                        onClick={() => { setStudentSubTab("myTeacher"); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("myTeacher")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                           studentSubTab === "myTeacher"
                             ? "bg-emerald-700 text-white shadow-sm"
@@ -5013,7 +5072,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                       {/* 5. Announcements */}
                       <button
-                        onClick={() => { setStudentSubTab("announcements"); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("announcements")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                           studentSubTab === "announcements"
                             ? "bg-emerald-700 text-white shadow-sm"
@@ -5025,7 +5084,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                       {/* 6. Notes Vault */}
                       <button
-                        onClick={() => { setStudentSubTab("vault" as any); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("vault" as any)}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                           studentSubTab === ("vault" as any)
                             ? "bg-emerald-700 text-white shadow-sm"
@@ -5038,7 +5097,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                       {/* 7. Tuition Payments */}
                       <button
-                        onClick={() => { setStudentSubTab("payments"); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("payments")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                           studentSubTab === "payments"
                             ? "bg-emerald-700 text-white shadow-sm"
@@ -5050,7 +5109,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
 
                       {/* 8. Certificates */}
                       <button
-                        onClick={() => { setStudentSubTab("certificates"); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("certificates")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                           studentSubTab === "certificates"
                             ? "bg-emerald-700 text-white shadow-sm"
@@ -5620,7 +5679,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                 <h4 className="font-bold text-xs uppercase tracking-wider text-amber-600 dark:text-amber-400">Class Quizzes</h4>
                                 <div className="space-y-2">
                                   {selectedCourse.quizzes.map((quiz) => {
-                                    const sub = submissions.find(s => s.referenceId === quiz.id);
+                                    const sub = submissions.find(s => 
+                                      (s.referenceId === quiz.id || (s.referenceTitle && quiz.title && s.referenceTitle.toLowerCase().trim() === quiz.title.toLowerCase().trim())) &&
+                                      (currentUser.role !== "student" || s.studentId === currentUser.id || (s.studentName && currentUser.name && s.studentName.toLowerCase().trim() === currentUser.name.toLowerCase().trim()))
+                                    );
                                     return (
                                       <div key={quiz.id} className="space-y-2">
                                         {sub ? (
