@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { User, Course, Submission, Announcement, SchoolCalendarEvent, DiscussionMessage, DirectMessage, AppNotification } from "../types";
 import {
   BookOpen, Users, Video, FileText, CheckCircle2, AlertTriangle, Send, Mail, Key, Shield, UserPlus, UserCheck,
-  ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive, CreditCard
+  ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive, CreditCard, Laptop
 } from "lucide-react";
 import { AutoSaveBadge, useAutoSave, AutoSaveNotesVault } from "./AutoSaveManager";
 import { getEmbedVideoUrl, isGoogleDriveUrl, getGoogleDriveFileId, getPdfDownloadUrl, getPdfViewUrl, getPdfEmbedPreviewUrl, isDirectVideoUrl } from "../utils/videoUtils";
@@ -205,7 +205,7 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   // Dashboard Sub-tabs
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [adminSubTab, setAdminSubTab] = useState<string>("payments");
-  const [studentSubTab, setStudentSubTab] = useState<"courses" | "assignments" | "announcements" | "payments" | "results" | "certificates" | "myTeacher" | "vault">("courses");
+  const [studentSubTab, setStudentSubTab] = useState<"courses" | "assignments" | "announcements" | "payments" | "results" | "certificates" | "myTeacher" | "vault" | "cbt">("courses");
   const [teacherSubTab, setTeacherSubTab] = useState<"tracker" | "grading" | "attendance" | "announcements" | "curriculum" | "admissions" | "myStudents" | "results">("tracker");
   const [selectedResultStudent, setSelectedResultStudent] = useState<string>("");
   const [resultSearchQuery, setResultSearchQuery] = useState<string>("");
@@ -1428,7 +1428,8 @@ Please keep this secure.`;
 
   // Submit Quiz answer sheet
   const handleQuizSubmit = (quizId: string) => {
-    if (!selectedCourse) return;
+    const matchedCourse = selectedCourse || courses.find(c => (c.quizzes || []).some((q: any) => q.id === quizId));
+    const courseIdToUse = matchedCourse?.id || activeQuiz?.courseId || "general";
     const token = localStorage.getItem("token") || "";
 
     fetch("/api/submissions/submit", {
@@ -1438,10 +1439,10 @@ Please keep this secure.`;
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
-        courseId: selectedCourse.id,
+        courseId: courseIdToUse,
         type: "quiz",
         referenceId: quizId,
-        referenceTitle: activeQuiz.title,
+        referenceTitle: activeQuiz?.title || "CBT Quiz",
         submissionContent: JSON.stringify(quizAnswers),
         maxPoints: 100
       })
@@ -4993,11 +4994,42 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         </div>
                       </div>
                       <button
-                        onClick={() => { setStudentSubTab("results"); setSelectedCourse(null); }}
+                        onClick={() => handleSelectStudentSubTab("results")}
                         className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5 border border-amber-600/30"
                       >
                         <Award className="w-4 h-4 text-emerald-950" />
                         <span>Open My Report Card ➔</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Quick CBT Examination Banner */}
+                  {studentSubTab !== "cbt" && (
+                    <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-950 text-white rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md border border-amber-400/30">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-amber-400 text-emerald-950 rounded-xl font-bold text-lg shrink-0 shadow-xs">
+                          💻
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-amber-200 font-serif">
+                              Take CBT Quizzes & Examinations
+                            </h3>
+                            <span className="text-[9px] bg-amber-400 text-emerald-950 font-black px-1.5 py-0.5 rounded uppercase">
+                              Online CBT Portal
+                            </span>
+                          </div>
+                          <p className="text-xs text-emerald-100/90 mt-0.5">
+                            Instant online testing, timer countdown, auto-saved answer drafts, and direct score sync to your academic report card.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleSelectStudentSubTab("cbt")}
+                        className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5 border border-amber-500/30"
+                      >
+                        <Laptop className="w-4 h-4 text-emerald-950" />
+                        <span>Launch CBT Examinations ➔</span>
                       </button>
                     </div>
                   )}
@@ -5034,7 +5066,23 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         </div>
                       </button>
 
-                      {/* 2. Enrolled Classes */}
+                      {/* 2. CBT Examinations & Quizzes (NEW Top Feature) */}
+                      <button
+                        onClick={() => handleSelectStudentSubTab("cbt")}
+                        className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 border ${
+                          studentSubTab === "cbt"
+                            ? "bg-emerald-800 text-amber-300 border-amber-400 shadow-sm font-extrabold"
+                            : "bg-emerald-900/10 dark:bg-emerald-950/50 text-emerald-900 dark:text-amber-200 border-emerald-300/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
+                        }`}
+                      >
+                        <Laptop className="w-4 h-4 text-amber-500 shrink-0" />
+                        <div className="text-left">
+                          <span className="block leading-tight">💻 CBT Examinations</span>
+                          <span className="text-[9px] opacity-80 font-normal block">Online CBT Tests & Exams</span>
+                        </div>
+                      </button>
+
+                      {/* 3. Enrolled Classes */}
                       <button
                         onClick={() => handleSelectStudentSubTab("courses")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
@@ -5046,7 +5094,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         📚 Enrolled Classes & Lectures
                       </button>
 
-                      {/* 3. Assignments */}
+                      {/* 4. Assignments */}
                       <button
                         onClick={() => handleSelectStudentSubTab("assignments")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
@@ -5058,7 +5106,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         📝 Homework & Worksheets
                       </button>
 
-                      {/* 4. My Teacher */}
+                      {/* 5. My Teacher */}
                       <button
                         onClick={() => handleSelectStudentSubTab("myTeacher")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
@@ -5070,7 +5118,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         👳‍♂️ My Assigned Ustadh
                       </button>
 
-                      {/* 5. Announcements */}
+                      {/* 6. Announcements */}
                       <button
                         onClick={() => handleSelectStudentSubTab("announcements")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
@@ -5082,7 +5130,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         📢 Academy Announcements
                       </button>
 
-                      {/* 6. Notes Vault */}
+                      {/* 7. Notes Vault */}
                       <button
                         onClick={() => handleSelectStudentSubTab("vault" as any)}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -5095,7 +5143,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         <span>💾 Auto-Saver Notes Vault</span>
                       </button>
 
-                      {/* 7. Tuition Payments */}
+                      {/* 8. Tuition Payments */}
                       <button
                         onClick={() => handleSelectStudentSubTab("payments")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
@@ -5107,7 +5155,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                         💳 Tuition & Monthly Fees
                       </button>
 
-                      {/* 8. Certificates */}
+                      {/* 9. Certificates */}
                       <button
                         onClick={() => handleSelectStudentSubTab("certificates")}
                         className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
@@ -5134,6 +5182,10 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                             <span className="font-bold text-amber-800 dark:text-amber-300 block">📊 Academic Report Card</span>
                             <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">View test scores, CBT quiz grades, 50-mark breakdown, teacher remarks, and semester GPA.</span>
                           </div>
+                          <div className={`p-2 rounded-lg ${studentSubTab === "cbt" ? "bg-amber-100 dark:bg-amber-950/50 border border-amber-300" : "bg-white/60 dark:bg-emerald-900/40"}`}>
+                            <span className="font-bold text-amber-800 dark:text-amber-300 block">💻 CBT Examinations</span>
+                            <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">Take timed computer-based tests online, complete auto-saved draft answer sheets, & view instant scores.</span>
+                          </div>
                           <div className={`p-2 rounded-lg ${studentSubTab === "courses" ? "bg-emerald-100 dark:bg-emerald-800/50 border border-emerald-300" : "bg-white/60 dark:bg-emerald-900/40"}`}>
                             <span className="font-bold text-emerald-900 dark:text-emerald-200 block">📚 Enrolled Classes</span>
                             <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">Stream video lectures, listen to Ustadh audio recordings, download Google Drive PDFs, & view slides.</span>
@@ -5141,10 +5193,6 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           <div className={`p-2 rounded-lg ${studentSubTab === "assignments" ? "bg-emerald-100 dark:bg-emerald-800/50 border border-emerald-300" : "bg-white/60 dark:bg-emerald-900/40"}`}>
                             <span className="font-bold text-emerald-900 dark:text-emerald-200 block">📝 Worksheets & Homework</span>
                             <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">Access weekly homework, submit completed worksheets, and check instructor marks.</span>
-                          </div>
-                          <div className={`p-2 rounded-lg ${studentSubTab === "myTeacher" ? "bg-emerald-100 dark:bg-emerald-800/50 border border-emerald-300" : "bg-white/60 dark:bg-emerald-900/40"}`}>
-                            <span className="font-bold text-emerald-900 dark:text-emerald-200 block">👳‍♂️ My Assigned Ustadh</span>
-                            <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">Contact your assigned Ustadh, request live consultation, and view office hours.</span>
                           </div>
                         </div>
                       </div>
@@ -5323,6 +5371,185 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                           </div>
                         );
                       })()}
+                    </div>
+                  )}
+
+                   {/* SUB-TAB: CBT EXAMINATIONS & QUIZZES */}
+                  {studentSubTab === "cbt" && (
+                    <div className="space-y-6 font-sans animate-fade-in">
+                      <div className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-950 text-white rounded-2xl p-6 sm:p-8 shadow-md border border-amber-400/40 relative overflow-hidden">
+                        <div className="relative z-10 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="bg-amber-400 text-emerald-950 text-[10px] font-black uppercase px-3 py-0.5 rounded-full tracking-wider shadow-xs">
+                              OFFICIAL CBT EXAMINATION CENTER
+                            </span>
+                            <span className="text-xs font-mono text-emerald-200 bg-emerald-950/60 px-3 py-1 rounded-lg border border-emerald-700/50 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-amber-300" />
+                              <span>Live Auto-Save & Timed CBT Engine</span>
+                            </span>
+                          </div>
+                          <h2 className="text-xl sm:text-2xl font-serif font-bold text-amber-200">
+                            Computer-Based Tests (CBT) & Examinations
+                          </h2>
+                          <p className="text-xs sm:text-sm text-emerald-100/90 max-w-2xl leading-relaxed">
+                            Welcome to the CBT Student Portal. All tests below are auto-saved in real-time. Once submitted, your score automatically syncs to your teacher's dashboard and updates your 50-mark report card.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* CBT Quizzes List Container */}
+                      <div className="bg-white dark:bg-emerald-900 rounded-2xl p-6 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-emerald-100 dark:border-emerald-800 pb-4">
+                          <div>
+                            <h3 className="font-bold text-base text-emerald-950 dark:text-amber-100 flex items-center gap-2 font-serif">
+                              <Laptop className="w-5 h-5 text-amber-500" />
+                              <span>Available CBT Examination Papers</span>
+                            </h3>
+                            <p className="text-xs text-slate-500 dark:text-emerald-300 mt-0.5">
+                              Track level: <strong className="uppercase">{currentUser.level || "beginner"}</strong>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-emerald-800 dark:text-amber-300 bg-emerald-50 dark:bg-emerald-950 px-3 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 font-mono">
+                              Submissions: {submissions.filter(s => s.studentId === currentUser.id && s.type === "quiz").length} Completed
+                            </span>
+                          </div>
+                        </div>
+
+                        {(() => {
+                          // Collect all quizzes across courses
+                          const allAvailableQuizzes: Array<{ quiz: any; course: Course }> = [];
+                          courses.forEach(c => {
+                            if (Array.isArray(c.quizzes)) {
+                              c.quizzes.forEach((q: any) => {
+                                allAvailableQuizzes.push({ quiz: q, course: c });
+                              });
+                            }
+                          });
+
+                          if (allAvailableQuizzes.length === 0) {
+                            return (
+                              <div className="p-12 text-center bg-slate-50 dark:bg-emerald-950/40 rounded-2xl border border-dashed border-slate-200 dark:border-emerald-800 space-y-3">
+                                <Laptop className="w-12 h-12 text-slate-400 mx-auto" />
+                                <p className="text-sm font-bold text-slate-600 dark:text-emerald-200">
+                                  No CBT Examinations currently scheduled.
+                                </p>
+                                <p className="text-xs text-slate-400 dark:text-emerald-400">
+                                  Your instructors will post new computer-based tests here shortly.
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {allAvailableQuizzes.map(({ quiz, course }) => {
+                                const submission = submissions.find(
+                                  s => (s.studentId === currentUser.id || s.studentName === currentUser.name) &&
+                                       s.referenceId === quiz.id &&
+                                       s.type === "quiz"
+                                );
+                                const isSubmitted = Boolean(submission);
+                                const isCourseLocked = (course.level !== "free" && !currentUser.isPaid) ||
+                                  (course.level !== "free" && course.level !== (currentUser.level || "beginner"));
+
+                                return (
+                                  <div
+                                    key={quiz.id}
+                                    className={`p-5 rounded-2xl border flex flex-col justify-between transition-all ${
+                                      isSubmitted
+                                        ? "bg-amber-50/30 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800/60"
+                                        : "bg-emerald-50/20 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800"
+                                    }`}
+                                  >
+                                    <div className="space-y-3">
+                                      <div className="flex items-center justify-between text-[10px] font-bold uppercase font-mono">
+                                        <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-amber-300 px-2.5 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
+                                          {course.title}
+                                        </span>
+                                        {isSubmitted ? (
+                                          <span className="bg-amber-500 text-emerald-950 font-black px-2 py-0.5 rounded shadow-xs">
+                                            COMPLETED ✓
+                                          </span>
+                                        ) : (
+                                          <span className="bg-emerald-700 text-white font-bold px-2 py-0.5 rounded">
+                                            READY TO START
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div>
+                                        <h4 className="font-bold text-sm text-emerald-950 dark:text-amber-100 font-serif">
+                                          {quiz.title}
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-emerald-300 mt-1 line-clamp-2">
+                                          {quiz.description || "Computer-based assessment for course evaluation."}
+                                        </p>
+                                      </div>
+
+                                      <div className="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-300 font-mono pt-1">
+                                        <span className="flex items-center gap-1">
+                                          <FileText className="w-3.5 h-3.5 text-amber-500" />
+                                          <span>{quiz.questions?.length || 0} Questions</span>
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                          <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                                          <span>{quiz.timeLimit || 15} Mins</span>
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="border-t border-emerald-100 dark:border-emerald-800/80 mt-4 pt-3 flex items-center justify-between">
+                                      {isSubmitted ? (
+                                        <div className="flex items-center justify-between w-full">
+                                          <div className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                                            <Award className="w-4 h-4 text-amber-500" />
+                                            <span>Score: {submission.grade ?? submission.score ?? 60}%</span>
+                                          </div>
+                                          <button
+                                            onClick={() => handleSelectStudentSubTab("results")}
+                                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-emerald-950 text-xs font-bold rounded-lg cursor-pointer transition-all"
+                                          >
+                                            View in Report Card ➔
+                                          </button>
+                                        </div>
+                                      ) : isCourseLocked ? (
+                                        <div className="flex items-center justify-between w-full">
+                                          <span className="text-[10px] text-red-500 font-bold flex items-center gap-1">
+                                            <Lock className="w-3 h-3" /> Track Restricted
+                                          </span>
+                                          <button
+                                            onClick={() => alert(`This test belongs to the ${course.level.toUpperCase()} track. Please contact admin to adjust your course track.`)}
+                                            className="px-3 py-1.5 bg-slate-200 dark:bg-emerald-950 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-lg cursor-pointer"
+                                          >
+                                            Restricted
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-between w-full">
+                                          <span className="text-[10px] text-emerald-600 dark:text-emerald-300 font-medium">
+                                            Instant Score & Auto-Save
+                                          </span>
+                                          <button
+                                            onClick={() => {
+                                              setSelectedCourse(course);
+                                              handleOpenQuizWithAutoSave(quiz);
+                                            }}
+                                            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                                          >
+                                            <Laptop className="w-3.5 h-3.5 text-amber-300" />
+                                            <span>Start CBT Test ➔</span>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
                   )}
 
