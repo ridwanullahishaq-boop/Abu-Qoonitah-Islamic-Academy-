@@ -10,7 +10,7 @@ import {
   ChevronRight, ArrowRight, MessageSquare, Award, Clock, Calendar, Lock, Unlock, Check, Star, Settings, Trash2, Plus, Edit, Bell, BellOff, HardDrive, CreditCard
 } from "lucide-react";
 import { AutoSaveBadge, useAutoSave, AutoSaveNotesVault } from "./AutoSaveManager";
-import { getEmbedVideoUrl, isGoogleDriveUrl, getPdfDownloadUrl, getPdfViewUrl, getPdfEmbedPreviewUrl, isDirectVideoUrl } from "../utils/videoUtils";
+import { getEmbedVideoUrl, isGoogleDriveUrl, getGoogleDriveFileId, getPdfDownloadUrl, getPdfViewUrl, getPdfEmbedPreviewUrl, isDirectVideoUrl } from "../utils/videoUtils";
 
 interface LMSPortalProps {
   isArabic: boolean;
@@ -99,6 +99,58 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
       [vidId]: !prev[vidId],
     }));
   };
+
+  const handlePdfDownloadClick = (e: React.MouseEvent, pdf: any) => {
+    e.preventDefault();
+    if (!pdf.url || pdf.url === "#") {
+      alert("No downloadable link provided for this handout.");
+      return;
+    }
+    const isGdrive = isGoogleDriveUrl(pdf.url);
+    if (isGdrive) {
+      const fileId = getGoogleDriveFileId(pdf.url);
+      if (fileId) {
+        const driveDownloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+        window.open(driveDownloadUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+    }
+    const downloadUrl = getPdfDownloadUrl(pdf.url);
+    if (downloadUrl && downloadUrl !== "#" && !downloadUrl.includes("example.com")) {
+      window.open(downloadUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    // Printable fallback blob generator for sample pdfs so download always succeeds
+    const htmlDoc = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8"/>
+          <title>${pdf.title} - Abu Qoonitah Islamic Academy</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; color: #064e3b; background: #fff; }
+            .card { border: 2px solid #065f46; padding: 30px; border-radius: 12px; }
+            h1 { color: #065f46; font-size: 22px; margin-bottom: 8px; }
+            p { font-size: 14px; color: #334155; line-height: 1.6; }
+            .badge { display: inline-block; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 9999px; font-weight: bold; font-size: 12px; margin-bottom: 16px; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="badge">Abu Qoonitah Islamic Academy • Study Material</div>
+            <h1>${pdf.title}</h1>
+            <p><strong>Description:</strong> ${pdf.description || "Official course study notes."}</p>
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e2e8f0;"/>
+            <p>This document is hosted for student download. Use this guide alongside your live Shaykh sessions.</p>
+          </div>
+          <script>window.onload = function() { window.print(); };</script>
+        </body>
+      </html>
+    `;
+    const blob = new Blob([htmlDoc], { type: "text/html" });
+    const blobUrl = URL.createObjectURL(blob);
+    window.open(blobUrl, "_blank");
+  };
   
   // --- Notifications State & Fetcher ---
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -153,8 +205,12 @@ export default function LMSPortal({ isArabic, currentUser, onLoginSuccess, onLog
   // Dashboard Sub-tabs
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [adminSubTab, setAdminSubTab] = useState<string>("payments");
-  const [studentSubTab, setStudentSubTab] = useState<"courses" | "assignments" | "announcements" | "payments" | "results" | "certificates" | "myTeacher">("courses");
-  const [teacherSubTab, setTeacherSubTab] = useState<"tracker" | "grading" | "attendance" | "announcements" | "curriculum" | "admissions" | "myStudents">("tracker");
+  const [studentSubTab, setStudentSubTab] = useState<"courses" | "assignments" | "announcements" | "payments" | "results" | "certificates" | "myTeacher" | "vault">("courses");
+  const [teacherSubTab, setTeacherSubTab] = useState<"tracker" | "grading" | "attendance" | "announcements" | "curriculum" | "admissions" | "myStudents" | "results">("tracker");
+  const [selectedResultStudent, setSelectedResultStudent] = useState<string>("");
+  const [resultSearchQuery, setResultSearchQuery] = useState<string>("");
+  const [resultLevelFilter, setResultLevelFilter] = useState<string>("all");
+  const [showNavGuide, setShowNavGuide] = useState<boolean>(true);
 
   // --- Teacher Registration states ---
   const [tchName, setTchName] = useState("");
@@ -4477,29 +4533,60 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
           <div className="bg-white dark:bg-natural-dark rounded-3xl border border-emerald-50 dark:border-emerald-900/30 shadow-sm overflow-hidden">
             <button
               onClick={() => { setActiveTab("dashboard"); setSelectedCourse(null); }}
-              className={`w-full text-left px-5 py-3.5 text-xs font-bold border-b border-emerald-50 dark:border-emerald-900/10 flex items-center justify-between transition-colors border-none cursor-pointer ${
+              className={`w-full text-left px-5 py-3 text-xs font-bold border-b border-emerald-50 dark:border-emerald-900/10 flex items-center justify-between transition-colors border-none cursor-pointer ${
                 activeTab === "dashboard" ? "bg-natural-sage/20 dark:bg-natural-green/45 text-natural-green dark:text-amber-300" : "text-slate-500 dark:text-emerald-200 hover:bg-natural-sage/10"
               }`}
             >
-              <span className="font-serif">🏡 Dashboard Home</span>
+              <div>
+                <span className="font-serif block text-sm">🏡 Dashboard Home</span>
+                <span className="text-[10px] text-slate-400 dark:text-emerald-300 font-normal block">Classes, assignments & portal overview</span>
+              </div>
               <ChevronRight className="w-4 h-4 text-natural-gold" />
             </button>
+
+            {/* Direct Student Results & Report Cards Navigation Shortcut */}
+            <button
+              onClick={() => {
+                setActiveTab("dashboard");
+                setSelectedCourse(null);
+                if (effectiveRole === "student") setStudentSubTab("results");
+                else if (effectiveRole === "teacher") setTeacherSubTab("results");
+                else if (effectiveRole === "admin") setAdminSubTab("results" as any);
+              }}
+              className="w-full text-left px-5 py-3 text-xs font-bold border-b border-emerald-50 dark:border-emerald-900/10 flex items-center justify-between bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200 transition-colors border-none cursor-pointer group"
+            >
+              <div>
+                <span className="font-serif block text-sm font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+                  <span>📊 Student Results & Report Cards</span>
+                  <span className="text-[8px] bg-amber-500 text-emerald-950 px-1.5 py-0.2 rounded font-black uppercase tracking-wider">Quick Link</span>
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-emerald-300 font-normal block">View CBT test marks, exam grades & 50-mark report card</span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-amber-600 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
             <button
               onClick={() => { setActiveTab("messages"); setSelectedCourse(null); }}
-              className={`w-full text-left px-5 py-3.5 text-xs font-bold border-b border-emerald-50 dark:border-emerald-900/10 flex items-center justify-between transition-colors border-none cursor-pointer ${
+              className={`w-full text-left px-5 py-3 text-xs font-bold border-b border-emerald-50 dark:border-emerald-900/10 flex items-center justify-between transition-colors border-none cursor-pointer ${
                 activeTab === "messages" ? "bg-natural-sage/20 dark:bg-natural-green/45 text-natural-green dark:text-amber-300" : "text-slate-500 dark:text-emerald-200 hover:bg-natural-sage/10"
               }`}
             >
-              <span className="font-serif">💬 Direct Messages</span>
+              <div>
+                <span className="font-serif block text-sm">💬 Direct Messages</span>
+                <span className="text-[10px] text-slate-400 dark:text-emerald-300 font-normal block">Private chat with Ustadh & admin</span>
+              </div>
               <ChevronRight className="w-4 h-4 text-natural-gold" />
             </button>
             <button
               onClick={() => { setActiveTab("calendar"); setSelectedCourse(null); }}
-              className={`w-full text-left px-5 py-3.5 text-xs font-bold border-b border-emerald-50 dark:border-emerald-900/10 flex items-center justify-between transition-colors border-none cursor-pointer ${
+              className={`w-full text-left px-5 py-3 text-xs font-bold border-b border-emerald-50 dark:border-emerald-900/10 flex items-center justify-between transition-colors border-none cursor-pointer ${
                 activeTab === "calendar" ? "bg-natural-sage/20 dark:bg-natural-green/45 text-natural-green dark:text-amber-300" : "text-slate-500 dark:text-emerald-200 hover:bg-natural-sage/10"
               }`}
             >
-              <span className="font-serif">📅 Academy Calendar</span>
+              <div>
+                <span className="font-serif block text-sm">📅 Academy Calendar</span>
+                <span className="text-[10px] text-slate-400 dark:text-emerald-300 font-normal block">Exam timetables, holidays & term dates</span>
+              </div>
               <ChevronRight className="w-4 h-4 text-natural-gold" />
             </button>
             <button
@@ -4825,89 +4912,184 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
               {effectiveRole === "student" && (
                 <div className="space-y-6 animate-fade-in">
                   
+                  {/* Quick-Jump Results Banner for High Discoverability */}
+                  {studentSubTab !== "results" && (
+                    <div className="bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-emerald-500/10 border-2 border-amber-500/40 dark:border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-amber-500 text-emerald-950 rounded-xl font-bold text-lg shrink-0 shadow-xs">
+                          📊
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-emerald-950 dark:text-amber-200 font-serif">
+                              Looking for Your Exam & Quiz Results?
+                            </h3>
+                            <span className="text-[9px] bg-amber-500 text-emerald-950 font-black px-1.5 py-0.5 rounded uppercase">
+                              50-Mark Report Card
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-emerald-200 mt-0.5">
+                            Your complete academic report card, CBT quiz scores, final exam grades, and teacher remarks are ready for viewing.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { setStudentSubTab("results"); setSelectedCourse(null); }}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-emerald-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5 border border-amber-600/30"
+                      >
+                        <Award className="w-4 h-4 text-emerald-950" />
+                        <span>Open My Report Card ➔</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Student Sub-tab Navigation Pills */}
-                  <div className="flex flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-800 pb-4">
-                    <button
-                      onClick={() => { setStudentSubTab("courses"); setSelectedCourse(null); }}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                        studentSubTab === "courses"
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
-                      }`}
-                    >
-                      📚 Enrolled Classes & Lectures
-                    </button>
-                    <button
-                      onClick={() => { setStudentSubTab("myTeacher"); setSelectedCourse(null); }}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                        studentSubTab === "myTeacher"
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
-                      }`}
-                    >
-                      👳‍♂️ My Assigned Teacher
-                    </button>
-                    <button
-                      onClick={() => { setStudentSubTab("assignments"); setSelectedCourse(null); }}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                        studentSubTab === "assignments"
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
-                      }`}
-                    >
-                      📝 Assignments & Worksheets
-                    </button>
-                    <button
-                      onClick={() => { setStudentSubTab("announcements"); setSelectedCourse(null); }}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                        studentSubTab === "announcements"
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
-                      }`}
-                    >
-                      📢 School Announcements
-                    </button>
-                    <button
-                      onClick={() => { setStudentSubTab("vault" as any); setSelectedCourse(null); }}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
-                        studentSubTab === ("vault" as any)
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
-                      }`}
-                    >
-                      <HardDrive className="w-3.5 h-3.5 text-amber-300" />
-                      <span>💾 Auto-Saver Notes Vault</span>
-                    </button>
-                    <button
-                      onClick={() => { setStudentSubTab("payments"); setSelectedCourse(null); }}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                        studentSubTab === "payments"
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
-                      }`}
-                    >
-                      💳 Monthly Tuition Payments
-                    </button>
-                    <button
-                      onClick={() => { setStudentSubTab("results"); setSelectedCourse(null); }}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                        studentSubTab === "results"
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
-                      }`}
-                    >
-                      📊 Academic Report Card
-                    </button>
-                    <button
-                      onClick={() => { setStudentSubTab("certificates"); setSelectedCourse(null); }}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                        studentSubTab === "certificates"
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
-                      }`}
-                    >
-                      🎓 Graduation Certificates
-                    </button>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 font-mono flex items-center gap-1">
+                        <span>🧭 Student Portal Sections</span>
+                        <span className="text-slate-400 font-normal">({studentSubTab.toUpperCase()} active)</span>
+                      </span>
+                      <button
+                        onClick={() => setShowNavGuide(!showNavGuide)}
+                        className="text-[10px] font-bold text-emerald-700 dark:text-amber-300 hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <span>{showNavGuide ? "Hide Navigation Guide ▴" : "Show Section Descriptions ▾"}</span>
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-800 pb-4">
+                      {/* 1. Academic Results (Highlighted) */}
+                      <button
+                        onClick={() => { setStudentSubTab("results"); setSelectedCourse(null); }}
+                        className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-2 border ${
+                          studentSubTab === "results"
+                            ? "bg-amber-500 text-emerald-950 border-amber-600 shadow-sm font-extrabold"
+                            : "bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-300 border-amber-300/40 hover:bg-amber-100"
+                        }`}
+                      >
+                        <Award className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
+                        <div className="text-left">
+                          <span className="block leading-tight">📊 Academic Report Card</span>
+                          <span className="text-[9px] opacity-80 font-normal block">Exam marks & CBT scores</span>
+                        </div>
+                      </button>
+
+                      {/* 2. Enrolled Classes */}
+                      <button
+                        onClick={() => { setStudentSubTab("courses"); setSelectedCourse(null); }}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          studentSubTab === "courses"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                        }`}
+                      >
+                        📚 Enrolled Classes & Lectures
+                      </button>
+
+                      {/* 3. Assignments */}
+                      <button
+                        onClick={() => { setStudentSubTab("assignments"); setSelectedCourse(null); }}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          studentSubTab === "assignments"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                        }`}
+                      >
+                        📝 Homework & Worksheets
+                      </button>
+
+                      {/* 4. My Teacher */}
+                      <button
+                        onClick={() => { setStudentSubTab("myTeacher"); setSelectedCourse(null); }}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          studentSubTab === "myTeacher"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                        }`}
+                      >
+                        👳‍♂️ My Assigned Ustadh
+                      </button>
+
+                      {/* 5. Announcements */}
+                      <button
+                        onClick={() => { setStudentSubTab("announcements"); setSelectedCourse(null); }}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          studentSubTab === "announcements"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                        }`}
+                      >
+                        📢 Academy Announcements
+                      </button>
+
+                      {/* 6. Notes Vault */}
+                      <button
+                        onClick={() => { setStudentSubTab("vault" as any); setSelectedCourse(null); }}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                          studentSubTab === ("vault" as any)
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                        }`}
+                      >
+                        <HardDrive className="w-3.5 h-3.5 text-amber-300" />
+                        <span>💾 Auto-Saver Notes Vault</span>
+                      </button>
+
+                      {/* 7. Tuition Payments */}
+                      <button
+                        onClick={() => { setStudentSubTab("payments"); setSelectedCourse(null); }}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          studentSubTab === "payments"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                        }`}
+                      >
+                        💳 Tuition & Monthly Fees
+                      </button>
+
+                      {/* 8. Certificates */}
+                      <button
+                        onClick={() => { setStudentSubTab("certificates"); setSelectedCourse(null); }}
+                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                          studentSubTab === "certificates"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
+                        }`}
+                      >
+                        🎓 Graduation Certificates
+                      </button>
+                    </div>
+
+                    {/* Section Description Guide Drawer */}
+                    {showNavGuide && (
+                      <div className="bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/80 rounded-xl p-3.5 text-xs space-y-2 animate-fade-in text-emerald-950 dark:text-white">
+                        <div className="flex items-center justify-between font-bold text-emerald-900 dark:text-amber-200 border-b border-emerald-100 dark:border-emerald-800 pb-1.5">
+                          <span className="flex items-center gap-1.5">
+                            <span>🧭 Interactive Portal Navigation Guide</span>
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-normal">Click any tab above to open that section</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                          <div className={`p-2 rounded-lg ${studentSubTab === "results" ? "bg-amber-100 dark:bg-amber-950/50 border border-amber-300" : "bg-white/60 dark:bg-emerald-900/40"}`}>
+                            <span className="font-bold text-amber-800 dark:text-amber-300 block">📊 Academic Report Card</span>
+                            <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">View test scores, CBT quiz grades, 50-mark breakdown, teacher remarks, and semester GPA.</span>
+                          </div>
+                          <div className={`p-2 rounded-lg ${studentSubTab === "courses" ? "bg-emerald-100 dark:bg-emerald-800/50 border border-emerald-300" : "bg-white/60 dark:bg-emerald-900/40"}`}>
+                            <span className="font-bold text-emerald-900 dark:text-emerald-200 block">📚 Enrolled Classes</span>
+                            <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">Stream video lectures, listen to Ustadh audio recordings, download Google Drive PDFs, & view slides.</span>
+                          </div>
+                          <div className={`p-2 rounded-lg ${studentSubTab === "assignments" ? "bg-emerald-100 dark:bg-emerald-800/50 border border-emerald-300" : "bg-white/60 dark:bg-emerald-900/40"}`}>
+                            <span className="font-bold text-emerald-900 dark:text-emerald-200 block">📝 Worksheets & Homework</span>
+                            <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">Access weekly homework, submit completed worksheets, and check instructor marks.</span>
+                          </div>
+                          <div className={`p-2 rounded-lg ${studentSubTab === "myTeacher" ? "bg-emerald-100 dark:bg-emerald-800/50 border border-emerald-300" : "bg-white/60 dark:bg-emerald-900/40"}`}>
+                            <span className="font-bold text-emerald-900 dark:text-emerald-200 block">👳‍♂️ My Assigned Ustadh</span>
+                            <span className="text-slate-600 dark:text-slate-300 leading-tight block mt-0.5">Contact your assigned Ustadh, request live consultation, and view office hours.</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Student Academic Status Banner */}
@@ -5368,22 +5550,14 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                               </a>
                                             )}
 
-                                            <a
-                                              href={downloadHref}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              download
+                                            <button
+                                              type="button"
+                                              onClick={(e) => handlePdfDownloadClick(e, pdf)}
                                               className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
                                               title="Download PDF file directly"
-                                              onClick={(e) => {
-                                                if (!pdf.url || pdf.url === "#") {
-                                                  e.preventDefault();
-                                                  alert("No downloadable link provided for this handout.");
-                                                }
-                                              }}
                                             >
                                               <span>📥 {pdf.fileSize ? `${pdf.fileSize} Download` : "Download PDF"}</span>
-                                            </a>
+                                            </button>
                                           </div>
                                         </div>
 
@@ -5406,15 +5580,13 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                                                     <span>Open in Google Drive ↗</span>
                                                   </a>
                                                 )}
-                                                <a
-                                                  href={downloadHref}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  download
-                                                  className="text-emerald-700 dark:text-emerald-300 font-bold hover:underline text-[11px] flex items-center gap-1"
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => handlePdfDownloadClick(e, pdf)}
+                                                  className="text-emerald-700 dark:text-emerald-300 font-bold hover:underline text-[11px] flex items-center gap-1 cursor-pointer"
                                                 >
                                                   <span>Download File 📥</span>
-                                                </a>
+                                                </button>
                                               </div>
                                             </div>
                                             {embedPreviewUrl ? (
@@ -6665,8 +6837,19 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                   {/* Teacher Sub-tab Navigation Pills */}
                   <div className="flex flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-800 pb-4">
                     <button
+                      onClick={() => setTeacherSubTab("results")}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border ${
+                        teacherSubTab === "results"
+                          ? "bg-amber-500 text-emerald-950 border-amber-600 shadow-sm font-extrabold"
+                          : "bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border-amber-300/40 hover:bg-amber-100"
+                      }`}
+                    >
+                      <Award className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0" />
+                      <span>📊 Student Results & Gradebook</span>
+                    </button>
+                    <button
                       onClick={() => setTeacherSubTab("tracker")}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === "tracker"
                           ? "bg-emerald-700 text-white shadow-sm"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -6677,7 +6860,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     </button>
                     <button
                       onClick={() => setTeacherSubTab("myStudents")}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === "myStudents"
                           ? "bg-emerald-700 text-white shadow-sm"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -6688,7 +6871,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     </button>
                     <button
                       onClick={() => setTeacherSubTab("grading")}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === "grading"
                           ? "bg-emerald-700 text-white shadow-sm"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -6699,7 +6882,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     </button>
                     <button
                       onClick={() => setTeacherSubTab("attendance")}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === "attendance"
                           ? "bg-emerald-700 text-white shadow-sm"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -6710,7 +6893,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     </button>
                     <button
                       onClick={() => setTeacherSubTab("announcements")}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === "announcements"
                           ? "bg-emerald-700 text-white shadow-sm"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -6721,7 +6904,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     </button>
                     <button
                       onClick={() => setTeacherSubTab("curriculum")}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === "curriculum"
                           ? "bg-emerald-700 text-white shadow-sm"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -6732,7 +6915,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     </button>
                     <button
                       onClick={() => setTeacherSubTab("vault" as any)}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === ("vault" as any)
                           ? "bg-emerald-700 text-white shadow-sm"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -6743,7 +6926,7 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                     </button>
                     <button
                       onClick={() => setTeacherSubTab("admissions")}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                         teacherSubTab === "admissions"
                           ? "bg-emerald-700 text-white shadow-sm"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -6753,6 +6936,253 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       <span>Admission Credentials List</span>
                     </button>
                   </div>
+
+                  {/* SUB-TAB: STUDENT RESULTS & GRADEBOOK INSPECTOR FOR TEACHERS */}
+                  {teacherSubTab === "results" && (
+                    <div className="bg-white dark:bg-emerald-900 rounded-2xl p-6 sm:p-8 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-6 animate-fade-in font-sans">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-emerald-100 dark:border-emerald-800 pb-4">
+                        <div>
+                          <h3 className="text-lg font-serif font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2">
+                            <Award className="w-5 h-5 text-amber-500" />
+                            <span>Student Academic Results & Gradebook Inspector</span>
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-emerald-300 mt-1">
+                            Select any student to view their 50-mark report card, CBT test scores, oral test marks, assignment scores, and attendance percentage.
+                          </p>
+                        </div>
+
+                        <div className="bg-amber-500/10 text-amber-800 dark:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-500/20 text-xs font-bold flex items-center gap-1.5">
+                          <span>🎓 Active Term: {globalActiveSemester}</span>
+                        </div>
+                      </div>
+
+                      {/* Search & Level Filter Bar */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-emerald-50/40 dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-800 text-xs">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase font-mono block">🔍 Search Student Name</label>
+                          <input
+                            type="text"
+                            value={resultSearchQuery}
+                            onChange={(e) => setResultSearchQuery(e.target.value)}
+                            placeholder="Type student name or username..."
+                            className="w-full bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 text-emerald-950 dark:text-white"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase font-mono block">📚 Filter Level Track</label>
+                          <select
+                            value={resultLevelFilter}
+                            onChange={(e) => setResultLevelFilter(e.target.value)}
+                            className="w-full bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 text-emerald-950 dark:text-white cursor-pointer"
+                          >
+                            <option value="all">📖 All Level Tracks ({allStudents.length} Students)</option>
+                            <option value="beginner">🌱 Beginner Level</option>
+                            <option value="intermediate">🌿 Intermediate Level</option>
+                            <option value="advanced">🌳 Advanced Level</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase font-mono block">👤 Pick Active Student</label>
+                          <select
+                            value={selectedResultStudent}
+                            onChange={(e) => setSelectedResultStudent(e.target.value)}
+                            className="w-full bg-amber-500/10 dark:bg-emerald-950 border border-amber-500/40 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 text-emerald-950 dark:text-amber-200 font-bold cursor-pointer"
+                          >
+                            <option value="">-- Select Student Report Card --</option>
+                            {allStudents
+                              .filter(s => resultLevelFilter === "all" || s.level === resultLevelFilter)
+                              .filter(s => !resultSearchQuery || s.name.toLowerCase().includes(resultSearchQuery.toLowerCase()) || s.username.toLowerCase().includes(resultSearchQuery.toLowerCase()))
+                              .map(s => (
+                                <option key={s.id} value={s.name}>
+                                  {s.name} ({s.level})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Student Quick-Select Chips */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase font-mono block">Quick Select Student Card:</span>
+                        <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 bg-slate-50 dark:bg-emerald-950/20 rounded-xl border border-slate-100 dark:border-emerald-900/40">
+                          {allStudents
+                            .filter(s => resultLevelFilter === "all" || s.level === resultLevelFilter)
+                            .filter(s => !resultSearchQuery || s.name.toLowerCase().includes(resultSearchQuery.toLowerCase()) || s.username.toLowerCase().includes(resultSearchQuery.toLowerCase()))
+                            .map(st => {
+                              const isSel = selectedResultStudent === st.name || (!selectedResultStudent && st === allStudents[0]);
+                              const m = calculateSemesterMarks(st.name);
+                              return (
+                                <button
+                                  key={st.id}
+                                  onClick={() => setSelectedResultStudent(st.name)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                                    isSel
+                                      ? "bg-amber-500 text-emerald-950 border-amber-600 shadow-xs font-extrabold"
+                                      : "bg-white dark:bg-emerald-900/60 text-slate-700 dark:text-emerald-200 border-slate-200 dark:border-emerald-800 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  <span>{st.name}</span>
+                                  <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isSel ? "bg-emerald-950 text-amber-300" : "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300"}`}>
+                                    {m.totalMarks}/50
+                                  </span>
+                                </button>
+                              );
+                            })}
+                        </div>
+                      </div>
+
+                      {/* Selected Student Academic Report Card Display */}
+                      {(() => {
+                        const activeStudentObj = allStudents.find(s => s.name === selectedResultStudent) || allStudents[0];
+                        if (!activeStudentObj) {
+                          return (
+                            <div className="p-8 text-center bg-slate-50 rounded-xl">
+                              <p className="text-xs text-slate-500">No student records found matching search filters.</p>
+                            </div>
+                          );
+                        }
+
+                        const stName = activeStudentObj.name;
+                        const marks = calculateSemesterMarks(stName);
+                        const tchGradeLetter = (marks.totalMarks >= 40) ? "A (Excellent)" : (marks.totalMarks >= 30) ? "B (Good)" : (marks.totalMarks >= 20) ? "C (Pass)" : "D (Needs Improvement)";
+                        const tchGradeArabic = (marks.totalMarks >= 40) ? "ممتاز" : (marks.totalMarks >= 30) ? "جيد جداً" : (marks.totalMarks >= 20) ? "جيد" : "ضعيف";
+
+                        return (
+                          <div className="bg-emerald-50/20 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800 rounded-2xl p-6 space-y-6 animate-fade-in">
+                            {/* Card Header */}
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-emerald-900 p-5 rounded-xl border border-emerald-100 dark:border-emerald-800 shadow-2xs">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-xl font-bold font-serif text-emerald-950 dark:text-amber-100">{stName}</h4>
+                                  <span className="bg-emerald-500/15 text-emerald-800 dark:text-amber-300 font-bold text-[10px] uppercase px-2.5 py-0.5 rounded-full">
+                                    {activeStudentObj.level} Level
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-emerald-300 mt-1">
+                                  Username: <span className="font-mono text-slate-700 dark:text-slate-200">@{activeStudentObj.username}</span> • Email: <span className="font-mono text-slate-700 dark:text-slate-200">{activeStudentObj.email}</span>
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <div className="bg-amber-500/15 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-500/30 text-center">
+                                  <span className="text-[9px] uppercase font-bold text-slate-500 dark:text-amber-300 block font-mono">Total Semester Grade</span>
+                                  <span className="text-xl font-black font-mono text-amber-700 dark:text-amber-300 block">
+                                    {marks.totalMarks} / 50 Marks
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.2 rounded inline-block mt-0.5 ${
+                                    marks.totalMarks >= 40 ? "bg-emerald-500 text-white" :
+                                    marks.totalMarks >= 30 ? "bg-blue-500 text-white" :
+                                    marks.totalMarks >= 20 ? "bg-amber-500 text-emerald-950" : "bg-red-500 text-white"
+                                  }`}>
+                                    {tchGradeLetter} ({tchGradeArabic})
+                                  </span>
+                                </div>
+
+                                <button
+                                  onClick={() => window.print()}
+                                  className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                                >
+                                  <span>🖨️ Print Report Card</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* 4 Score Component Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="bg-white dark:bg-emerald-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 font-mono">1. Homework Worksheets</span>
+                                <div className="text-lg font-black font-mono text-emerald-800 dark:text-amber-300">
+                                  {marks.assignmentMarks} / 20 Marks
+                                </div>
+                                <p className="text-[10px] text-slate-500">{marks.assignmentCount} worksheets submitted</p>
+                              </div>
+
+                              <div className="bg-white dark:bg-emerald-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 font-mono">2. Computer Test (CBT)</span>
+                                <div className="text-lg font-black font-mono text-emerald-800 dark:text-amber-300">
+                                  {marks.cbtMark} / 5 Marks
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate" title={marks.cbtTitle}>{marks.cbtTitle}</p>
+                              </div>
+
+                              <div className="bg-white dark:bg-emerald-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 font-mono">3. Oral Recitation Test</span>
+                                <div className="text-lg font-black font-mono text-emerald-800 dark:text-amber-300">
+                                  {marks.oralMark} / 5 Marks
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate" title={marks.oralTitle}>{marks.oralTitle}</p>
+                              </div>
+
+                              <div className="bg-white dark:bg-emerald-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 font-mono">4. Term Final Exam</span>
+                                <div className="text-lg font-black font-mono text-emerald-800 dark:text-amber-300">
+                                  {marks.finalMark} / 20 Marks
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate" title={marks.finalTitle}>{marks.finalTitle}</p>
+                              </div>
+                            </div>
+
+                            {/* All Submissions Table for this Student */}
+                            <div className="bg-white dark:bg-emerald-900 rounded-xl p-4 border border-emerald-100 dark:border-emerald-800 space-y-3">
+                              <h5 className="font-bold text-xs text-emerald-950 dark:text-amber-100 uppercase font-mono">
+                                📋 All Submitted Worksheets & Exam History for {stName}
+                              </h5>
+
+                              {submissions.filter(s => s.studentName === stName).length === 0 ? (
+                                <p className="text-xs text-slate-400 italic p-3 text-center">No submitted worksheets or tests logged yet for this student.</p>
+                              ) : (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-200">
+                                    <thead>
+                                      <tr className="border-b border-emerald-100 dark:border-emerald-800 text-[10px] uppercase font-mono text-slate-400">
+                                        <th className="py-2 px-2">Type</th>
+                                        <th className="py-2 px-2">Course & Reference Title</th>
+                                        <th className="py-2 px-2">Submitted Date</th>
+                                        <th className="py-2 px-2">Score Obtained</th>
+                                        <th className="py-2 px-2">Status</th>
+                                        <th className="py-2 px-2">Ustadh Comments</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {submissions.filter(s => s.studentName === stName).map((sub) => (
+                                        <tr key={sub.id} className="border-b border-emerald-50 dark:border-emerald-850 hover:bg-slate-50/50 dark:hover:bg-emerald-950/40">
+                                          <td className="py-2.5 px-2 font-bold uppercase text-[10px] font-mono text-amber-700 dark:text-amber-300">
+                                            {sub.type}
+                                          </td>
+                                          <td className="py-2.5 px-2">
+                                            <span className="font-bold block text-emerald-950 dark:text-white">{sub.referenceTitle || sub.courseTitle}</span>
+                                            <span className="text-[10px] text-slate-400 block">{sub.courseTitle}</span>
+                                          </td>
+                                          <td className="py-2.5 px-2 text-[11px] text-slate-500">
+                                            {new Date(sub.submittedAt).toLocaleDateString()}
+                                          </td>
+                                          <td className="py-2.5 px-2 font-mono font-bold text-emerald-800 dark:text-amber-300">
+                                            {sub.score !== undefined ? `${sub.score} / ${subMaxPoints(sub)}` : "Pending Grade"}
+                                          </td>
+                                          <td className="py-2.5 px-2">
+                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase font-mono ${
+                                              sub.status === "graded" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-800"
+                                            }`}>
+                                              {sub.status}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-2 text-[11px] text-slate-500 italic max-w-xs truncate">
+                                            {sub.comments || "No comments written yet."}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* SUB-TAB: MY ALLOCATED STUDENTS */}
                   {teacherSubTab === "myStudents" && (
@@ -9197,8 +9627,19 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                   {/* Admin Navigation Pills */}
                   <div className="flex flex-wrap gap-2 border-b border-emerald-100 dark:border-emerald-800 pb-4">
                     <button
+                      onClick={() => setAdminSubTab("results" as any)}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border ${
+                        adminSubTab === "results"
+                          ? "bg-amber-500 text-emerald-950 border-amber-600 shadow font-extrabold"
+                          : "bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border-amber-300/40 hover:bg-amber-100"
+                      }`}
+                    >
+                      <Award className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0" />
+                      <span>📊 Student Results & Gradebook</span>
+                    </button>
+                    <button
                       onClick={() => setAdminSubTab("payments")}
-                      className={`px-4 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                         adminSubTab === "payments"
                           ? "bg-emerald-700 text-white shadow"
                           : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100"
@@ -9359,6 +9800,253 @@ Kindly verify my proof of payment and clear my academic lock. Jazakum Allahu Kha
                       <span>👨‍🏫 Register Teacher</span>
                     </button>
                   </div>
+
+                  {/* SUB-TAB 0: STUDENT RESULTS & GRADEBOOK INSPECTOR FOR ADMIN */}
+                  {adminSubTab === "results" && (
+                    <div className="bg-white dark:bg-emerald-900 rounded-2xl p-6 sm:p-8 border border-emerald-100 dark:border-emerald-800 shadow-sm space-y-6 animate-fade-in font-sans">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-emerald-100 dark:border-emerald-800 pb-4">
+                        <div>
+                          <h3 className="text-lg font-serif font-bold text-emerald-950 dark:text-amber-100 flex items-center gap-2">
+                            <Award className="w-5 h-5 text-amber-500" />
+                            <span>Administrator Gradebook & Report Card Inspector</span>
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-emerald-300 mt-1">
+                            Full institution access: Search any student across all levels to inspect report cards, CBT test scores, oral exams, and worksheet history.
+                          </p>
+                        </div>
+
+                        <div className="bg-amber-500/10 text-amber-800 dark:text-amber-300 px-3 py-1.5 rounded-lg border border-amber-500/20 text-xs font-bold flex items-center gap-1.5">
+                          <span>🎓 Global Active Term: {globalActiveSemester}</span>
+                        </div>
+                      </div>
+
+                      {/* Search & Level Filter Bar */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-emerald-50/40 dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-800 text-xs">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase font-mono block">🔍 Search Student Name</label>
+                          <input
+                            type="text"
+                            value={resultSearchQuery}
+                            onChange={(e) => setResultSearchQuery(e.target.value)}
+                            placeholder="Type student name or username..."
+                            className="w-full bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 text-emerald-950 dark:text-white"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase font-mono block">📚 Filter Level Track</label>
+                          <select
+                            value={resultLevelFilter}
+                            onChange={(e) => setResultLevelFilter(e.target.value)}
+                            className="w-full bg-white dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-600 text-emerald-950 dark:text-white cursor-pointer"
+                          >
+                            <option value="all">📖 All Level Tracks ({allStudents.length} Students)</option>
+                            <option value="beginner">🌱 Beginner Level</option>
+                            <option value="intermediate">🌿 Intermediate Level</option>
+                            <option value="advanced">🌳 Advanced Level</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase font-mono block">👤 Pick Active Student</label>
+                          <select
+                            value={selectedResultStudent}
+                            onChange={(e) => setSelectedResultStudent(e.target.value)}
+                            className="w-full bg-amber-500/10 dark:bg-emerald-950 border border-amber-500/40 dark:border-emerald-800 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 text-emerald-950 dark:text-amber-200 font-bold cursor-pointer"
+                          >
+                            <option value="">-- Select Student Report Card --</option>
+                            {allStudents
+                              .filter(s => resultLevelFilter === "all" || s.level === resultLevelFilter)
+                              .filter(s => !resultSearchQuery || s.name.toLowerCase().includes(resultSearchQuery.toLowerCase()) || s.username.toLowerCase().includes(resultSearchQuery.toLowerCase()))
+                              .map(s => (
+                                <option key={s.id} value={s.name}>
+                                  {s.name} ({s.level})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Student Quick-Select Chips */}
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase font-mono block">Quick Select Student Card:</span>
+                        <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 bg-slate-50 dark:bg-emerald-950/20 rounded-xl border border-slate-100 dark:border-emerald-900/40">
+                          {allStudents
+                            .filter(s => resultLevelFilter === "all" || s.level === resultLevelFilter)
+                            .filter(s => !resultSearchQuery || s.name.toLowerCase().includes(resultSearchQuery.toLowerCase()) || s.username.toLowerCase().includes(resultSearchQuery.toLowerCase()))
+                            .map(st => {
+                              const isSel = selectedResultStudent === st.name || (!selectedResultStudent && st === allStudents[0]);
+                              const m = calculateSemesterMarks(st.name);
+                              return (
+                                <button
+                                  key={st.id}
+                                  onClick={() => setSelectedResultStudent(st.name)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                                    isSel
+                                      ? "bg-amber-500 text-emerald-950 border-amber-600 shadow-xs font-extrabold"
+                                      : "bg-white dark:bg-emerald-900/60 text-slate-700 dark:text-emerald-200 border-slate-200 dark:border-emerald-800 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  <span>{st.name}</span>
+                                  <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isSel ? "bg-emerald-950 text-amber-300" : "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300"}`}>
+                                    {m.totalMarks}/50
+                                  </span>
+                                </button>
+                              );
+                            })}
+                        </div>
+                      </div>
+
+                      {/* Selected Student Academic Report Card Display */}
+                      {(() => {
+                        const activeStudentObj = allStudents.find(s => s.name === selectedResultStudent) || allStudents[0];
+                        if (!activeStudentObj) {
+                          return (
+                            <div className="p-8 text-center bg-slate-50 rounded-xl">
+                              <p className="text-xs text-slate-500">No student records found matching search filters.</p>
+                            </div>
+                          );
+                        }
+
+                        const stName = activeStudentObj.name;
+                        const marks = calculateSemesterMarks(stName);
+                        const admGradeLetter = (marks.totalMarks >= 40) ? "A (Excellent)" : (marks.totalMarks >= 30) ? "B (Good)" : (marks.totalMarks >= 20) ? "C (Pass)" : "D (Needs Improvement)";
+                        const admGradeArabic = (marks.totalMarks >= 40) ? "ممتاز" : (marks.totalMarks >= 30) ? "جيد جداً" : (marks.totalMarks >= 20) ? "جيد" : "ضعيف";
+
+                        return (
+                          <div className="bg-emerald-50/20 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800 rounded-2xl p-6 space-y-6 animate-fade-in">
+                            {/* Card Header */}
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-emerald-900 p-5 rounded-xl border border-emerald-100 dark:border-emerald-800 shadow-2xs">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-xl font-bold font-serif text-emerald-950 dark:text-amber-100">{stName}</h4>
+                                  <span className="bg-emerald-500/15 text-emerald-800 dark:text-amber-300 font-bold text-[10px] uppercase px-2.5 py-0.5 rounded-full">
+                                    {activeStudentObj.level} Level
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-emerald-300 mt-1">
+                                  Username: <span className="font-mono text-slate-700 dark:text-slate-200">@{activeStudentObj.username}</span> • Email: <span className="font-mono text-slate-700 dark:text-slate-200">{activeStudentObj.email}</span>
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <div className="bg-amber-500/15 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-500/30 text-center">
+                                  <span className="text-[9px] uppercase font-bold text-slate-500 dark:text-amber-300 block font-mono">Total Semester Grade</span>
+                                  <span className="text-xl font-black font-mono text-amber-700 dark:text-amber-300 block">
+                                    {marks.totalMarks} / 50 Marks
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.2 rounded inline-block mt-0.5 ${
+                                    marks.totalMarks >= 40 ? "bg-emerald-500 text-white" :
+                                    marks.totalMarks >= 30 ? "bg-blue-500 text-white" :
+                                    marks.totalMarks >= 20 ? "bg-amber-500 text-emerald-950" : "bg-red-500 text-white"
+                                  }`}>
+                                    {admGradeLetter} ({admGradeArabic})
+                                  </span>
+                                </div>
+
+                                <button
+                                  onClick={() => window.print()}
+                                  className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                                >
+                                  <span>🖨️ Print Report Card</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* 4 Score Component Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="bg-white dark:bg-emerald-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 font-mono">1. Homework Worksheets</span>
+                                <div className="text-lg font-black font-mono text-emerald-800 dark:text-amber-300">
+                                  {marks.assignmentMarks} / 20 Marks
+                                </div>
+                                <p className="text-[10px] text-slate-500">{marks.assignmentCount} worksheets submitted</p>
+                              </div>
+
+                              <div className="bg-white dark:bg-emerald-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 font-mono">2. Computer Test (CBT)</span>
+                                <div className="text-lg font-black font-mono text-emerald-800 dark:text-amber-300">
+                                  {marks.cbtMark} / 5 Marks
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate" title={marks.cbtTitle}>{marks.cbtTitle}</p>
+                              </div>
+
+                              <div className="bg-white dark:bg-emerald-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 font-mono">3. Oral Recitation Test</span>
+                                <div className="text-lg font-black font-mono text-emerald-800 dark:text-amber-300">
+                                  {marks.oralMark} / 5 Marks
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate" title={marks.oralTitle}>{marks.oralTitle}</p>
+                              </div>
+
+                              <div className="bg-white dark:bg-emerald-900 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-1">
+                                <span className="text-[10px] font-bold uppercase text-slate-400 font-mono">4. Term Final Exam</span>
+                                <div className="text-lg font-black font-mono text-emerald-800 dark:text-amber-300">
+                                  {marks.finalMark} / 20 Marks
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate" title={marks.finalTitle}>{marks.finalTitle}</p>
+                              </div>
+                            </div>
+
+                            {/* All Submissions Table for this Student */}
+                            <div className="bg-white dark:bg-emerald-900 rounded-xl p-4 border border-emerald-100 dark:border-emerald-800 space-y-3">
+                              <h5 className="font-bold text-xs text-emerald-950 dark:text-amber-100 uppercase font-mono">
+                                📋 All Submitted Worksheets & Exam History for {stName}
+                              </h5>
+
+                              {submissions.filter(s => s.studentName === stName).length === 0 ? (
+                                <p className="text-xs text-slate-400 italic p-3 text-center">No submitted worksheets or tests logged yet for this student.</p>
+                              ) : (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-left text-xs text-slate-700 dark:text-slate-200">
+                                    <thead>
+                                      <tr className="border-b border-emerald-100 dark:border-emerald-800 text-[10px] uppercase font-mono text-slate-400">
+                                        <th className="py-2 px-2">Type</th>
+                                        <th className="py-2 px-2">Course & Reference Title</th>
+                                        <th className="py-2 px-2">Submitted Date</th>
+                                        <th className="py-2 px-2">Score Obtained</th>
+                                        <th className="py-2 px-2">Status</th>
+                                        <th className="py-2 px-2">Ustadh Comments</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {submissions.filter(s => s.studentName === stName).map((sub) => (
+                                        <tr key={sub.id} className="border-b border-emerald-50 dark:border-emerald-850 hover:bg-slate-50/50 dark:hover:bg-emerald-950/40">
+                                          <td className="py-2.5 px-2 font-bold uppercase text-[10px] font-mono text-amber-700 dark:text-amber-300">
+                                            {sub.type}
+                                          </td>
+                                          <td className="py-2.5 px-2">
+                                            <span className="font-bold block text-emerald-950 dark:text-white">{sub.referenceTitle || sub.courseTitle}</span>
+                                            <span className="text-[10px] text-slate-400 block">{sub.courseTitle}</span>
+                                          </td>
+                                          <td className="py-2.5 px-2 text-[11px] text-slate-500">
+                                            {new Date(sub.submittedAt).toLocaleDateString()}
+                                          </td>
+                                          <td className="py-2.5 px-2 font-mono font-bold text-emerald-800 dark:text-amber-300">
+                                            {sub.score !== undefined ? `${sub.score} / ${subMaxPoints(sub)}` : "Pending Grade"}
+                                          </td>
+                                          <td className="py-2.5 px-2">
+                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase font-mono ${
+                                              sub.status === "graded" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-800"
+                                            }`}>
+                                              {sub.status}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-2 text-[11px] text-slate-500 italic max-w-xs truncate">
+                                            {sub.comments || "No comments written yet."}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* SUB-TAB 1: PAYMENTS & CLEARANCES */}
                   {adminSubTab === "payments" && (

@@ -67,7 +67,7 @@ export function getEmbedVideoUrl(url?: string): string {
 
 export function isGoogleDriveUrl(url?: string): boolean {
   if (!url) return false;
-  return url.includes("drive.google.com");
+  return url.includes("drive.google.com") || url.includes("docs.google.com");
 }
 
 export function getGoogleDriveFileId(url?: string): string | null {
@@ -89,6 +89,14 @@ export function getGoogleDriveFileId(url?: string): string | null {
   if (ucMatch && ucMatch[1]) {
     return ucMatch[1];
   }
+  const documentDMatch = trimmed.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+  if (documentDMatch && documentDMatch[1]) {
+    return documentDMatch[1];
+  }
+  const spreadDMatch = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (spreadDMatch && spreadDMatch[1]) {
+    return spreadDMatch[1];
+  }
   return null;
 }
 
@@ -98,7 +106,7 @@ export function getGoogleDriveFileId(url?: string): string | null {
 export function getPdfEmbedPreviewUrl(url?: string): string {
   if (!url) return "";
   const trimmed = url.trim();
-  if (trimmed.includes("drive.google.com")) {
+  if (isGoogleDriveUrl(trimmed)) {
     const fileId = getGoogleDriveFileId(trimmed);
     if (fileId) {
       return `https://drive.google.com/file/d/${fileId}/preview`;
@@ -118,10 +126,10 @@ export function getPdfEmbedPreviewUrl(url?: string): string {
 export function getPdfDownloadUrl(url?: string): string {
   if (!url) return "#";
   const trimmed = url.trim();
-  if (trimmed.includes("drive.google.com")) {
+  if (isGoogleDriveUrl(trimmed)) {
     const fileId = getGoogleDriveFileId(trimmed);
     if (fileId) {
-      return `https://drive.google.com/uc?export=download&id=${fileId}&confirm=no_antivirus`;
+      return `https://drive.google.com/uc?export=download&id=${fileId}`;
     }
   }
   return trimmed;
@@ -133,7 +141,7 @@ export function getPdfDownloadUrl(url?: string): string {
 export function getPdfViewUrl(url?: string): string {
   if (!url) return "#";
   const trimmed = url.trim();
-  if (trimmed.includes("drive.google.com")) {
+  if (isGoogleDriveUrl(trimmed)) {
     const fileId = getGoogleDriveFileId(trimmed);
     if (fileId) {
       return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
